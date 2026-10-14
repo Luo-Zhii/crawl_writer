@@ -58,7 +58,7 @@ make lint   # ruff + tsc
 ## Roadmap
 
 - [x] Scaffold backend + frontend
-- [ ] DB và storage layer
+- [x] DB và storage layer
 - [ ] Fetcher (retry, rate limit, phát hiện bị chặn)
 - [ ] Source adapter cho từng site
 - [ ] Crawl pipeline có resume
@@ -74,3 +74,23 @@ make lint   # ruff + tsc
 Tool này dành cho việc **backup cá nhân** nội dung bạn có quyền truy cập hợp pháp. Truyện trên các site đều thuộc bản quyền của tác giả và nhà phát hành. Đừng phân phối lại hay bán nội dung tải về. Hãy để nguyên rate limit mặc định để không làm quá tải site nguồn.
 
 Kiến trúc adapter tham khảo cách tiếp cận của [lightnovel-crawler](https://github.com/lncrawl/lightnovel-crawler) (mỗi site một crawler cùng chung một contract, resume theo chương, phân biệt bị chặn với lỗi mạng). Code trong repo này viết riêng.
+
+## Migration
+
+Schema do Alembic quản lý:
+
+```bash
+cd backend
+../.venv/bin/python -m alembic upgrade head          # áp dụng migration
+../.venv/bin/python -m alembic revision --autogenerate -m "mô tả"
+../.venv/bin/python -m alembic check                 # kiểm tra model có lệch schema không
+```
+
+## CLI
+
+```bash
+cd backend
+../.venv/bin/python -m app.cli paths                 # xem dữ liệu nằm ở đâu
+../.venv/bin/python -m app.cli db init               # tạo bảng
+../.venv/bin/python -m app.cli db seed-demo          # tạo một truyện giả để thử API
+```
