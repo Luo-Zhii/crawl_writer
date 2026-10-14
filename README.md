@@ -65,10 +65,11 @@ make lint   # ruff + tsc
 - [x] Xuất TXT / JSON / EPUB
 - [x] UI quản lý crawl và thư viện
 - [x] Playwright cho site Cloudflare (xem phần giới hạn bên dưới)
-- [x] Adapter site Trung (đang có: uukanshu, czbooks)
+- [x] Adapter site Trung (đang có: uukanshu, czbooks, qidian)
 - [x] Dịch raw Trung sang Việt + glossary (xem phần giới hạn bên dưới)
 - [x] Trình đọc trong web
-- [ ] Theo dõi và tự cập nhật chương mới
+- [x] Theo dõi và tự cập nhật chương mới
+- [x] Qidian: chương miễn phí (xem phần giới hạn bên dưới)
 
 ## Lưu ý pháp lý
 
@@ -298,6 +299,7 @@ Khảo sát trực tiếp 20 domain:
 | --- | --- |
 | uukanshu.cc (UU看書) | **chạy được**, đã có adapter, phồn thể |
 | czbooks.net (小說狂人) | **chạy được**, đã có adapter, phồn thể |
+| qidian.com (起点中文网) | **chạy được qua `m.qidian.com`**, đã có adapter, chỉ chương miễn phí |
 | 69shuba.com, 81zw.com, twkan.com | Cloudflare chặn (trang "Just a moment...") |
 | ptwxz.com (飄天文學) | có trang chống bot, nội dung GB18030 |
 | 3bqg.cc (笔趣阁) | redirect sang 33bqg.com rồi đẩy vào `/user/verify.html` |
@@ -323,6 +325,57 @@ dạng kia, nên bước dịch sẽ chuẩn hoá về một dạng trước.
 Encoding: nhiều site Trung khai GBK/GB2312 chỉ trong thẻ `<meta>` chứ không
 trong HTTP header, nên `app/fetch/decode.py` ưu tiên meta hơn header và nới
 gb2312/gbk thành gb18030.
+
+### Qidian (起点中文网) — chỉ chương miễn phí
+
+Qidian không dùng `zh_base.py` mà có adapter riêng (`app/sources/qidian.py`),
+vì nó khác ba điểm, tất cả đều đã kiểm tra trực tiếp:
+
+- **Bản desktop bị chặn.** `www.qidian.com` trả HTTP 202 với body ~209 byte
+  thay vì trang thật. `m.qidian.com` trả nội dung bình thường, nên adapter làm
+  việc hoàn toàn trên host mobile. Dán link `www` vẫn được: `canonical_url` tự
+  đổi sang `m.`.
+- **Không có gì trong HTML.** Site mobile là app vite-plugin-ssr, toàn bộ dữ
+  liệu nằm trong JSON ở thẻ `<script id="vite-plugin-ssr_pageContext">`. Nên
+  adapter không có selector nào, chỉ tra cứu dictionary.
+- **Phần lớn truyện phải trả tiền.** Qidian cho miễn phí quyển đầu rồi thu phí
+  phần còn lại.
+
+Chương trả phí **vẫn trả HTTP 200**, kèm một đoạn teaser ngắn trong trường
+`content`, nên "parse được" không đồng nghĩa với "lấy được chương". Adapter
+chặn theo ba lớp:
+
+| Lớp | Dấu hiệu | Xử lý |
+| --- | --- | --- |
+| Mục lục | `sS != 1` | bỏ qua, **không** tốn request |
+| Nội dung chương | `vipStatus=1` và `isBuy=0` | `ChapterLocked` → `skipped_vip` |
+| Nội dung chương | text ngắn hơn 30% `wordsCount` đã khai | `ChapterLocked` |
+
+Lớp đầu là lý do adapter không nã hàng nghìn request vô ích: với truyện đã thử
+(1418 chương) chỉ **153 chương miễn phí**, tức là bỏ qua được 1265 request chỉ
+để nhận về teaser.
+
+Số chương lấy theo **vị trí trong mục lục**, không lấy từ tiêu đề như các site
+Trung khác, vì Qidian đánh số lại từ `第一章` ở mỗi quyển nên tiêu đề sẽ trùng
+nhau giữa các quyển. Chương bị bỏ qua vẫn giữ nguyên số của nó, nhờ vậy số
+chương không bị dồn lại khi mua thêm chương về sau.
+
+Hai chi tiết nhỏ nhưng dễ mất thời gian nếu không biết:
+
+- Trường `errorMsg` trong payload là chuỗi `"!undefined"` ở **mọi** trang, kể
+  cả trang chạy tốt, nên nó không mang thông tin gì. Book id không tồn tại thể
+  hiện bằng `pageData` null (kèm HTTP 404).
+- Một số chương bị **đổi hình chữ** qua font riêng (`randomFont`,
+  `fixedFontWoff2`). Adapter từ chối lưu những chương này, vì lưu vào sẽ được
+  một mớ chữ trông như thật nhưng sai hoàn toàn — tệ hơn là báo lỗi.
+
+Ảnh bìa được **ghép từ book id** (`bookcover.yuewen.com/qdbimg/349573/<id>/600.webp`)
+chứ không scrape, vì trang mobile chỉ tham chiếu bìa qua CSS background và một
+`srcset` các bản resize.
+
+Chưa làm: mua chương bằng tài khoản. Nếu dán cookie đăng nhập vào phần Cài đặt
+thì `sS` và `isBuy` sẽ phản ánh số chương đã mua, nên chương đã mua được tải về
+bình thường — nhưng chỗ này chưa kiểm tra trực tiếp vì cần tài khoản có số dư.
 
 ## Dịch raw Trung sang Việt
 

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><title>测试书名 - 目录</title></head>
+<body>
+<div id="app"></div>
+<script id="vite-plugin-ssr_pageContext" type="application/json">
+{
+  "pageContext": {
+    "_pageId": "/pages/catalog",
+    "routeParams": {"bookId": "99001"},
+    "urlPathname": "/book/99001/catalog/",
+    "errorMsg": "",
+    "pageProps": {
+      "configData": {},
+      "pageData": {
+        "bookId": 99001,
+        "bookName": "测试书名",
+        "chapterTotalCnt": 6,
+        "salesMode": 1,
+        "vs": [
+          {
+            "_index": 0,
+            "vId": 700001,
+            "vN": "第一卷 免费卷",
+            "vS": 0,
+            "cCnt": 3,
+            "cs": [
+              {"id": 55500001, "cN": "第一章 开端", "sS": 1, "cnt": 2100, "uT": "2026-01-01 08:00"},
+              {"id": 55500002, "cN": "第二章 启程", "sS": 1, "cnt": 2200, "uT": "2026-01-02 08:00"},
+              {"id": 55500003, "cN": "第三章 山路", "sS": 1, "cnt": 2300, "uT": "2026-01-03 08:00"}
+            ]
+          },
+          {
+            "_index": 1,
+            "vId": 700002,
+            "vN": "第二卷 付费卷",
+            "vS": 1,
+            "cCnt": 3,
+            "cs": [
+              {"id": 55500004, "cN": "第一章 旧友", "sS": 0, "cnt": 2400, "uT": "2026-01-04 08:00"},
+              {"id": 55500005, "cN": "第二章 夜谈", "sS": 0, "cnt": 2500, "uT": "2026-01-05 08:00"},
+              {"id": 55500006, "cN": "作者的话", "sS": 1, "cnt": 600, "uT": "2026-01-06 08:00"}
+            ]
+          }
+        ]
+      }
+    }
+  }
+}
+</script>
+</body>
+</html>

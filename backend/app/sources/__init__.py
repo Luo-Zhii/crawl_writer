@@ -8,6 +8,7 @@ by the time anything calls :func:`app.sources.registry.resolve`.
 # are kept below the shared definitions they depend on.
 from app.sources import (  # noqa: F401  (side effect: registration)
     czbooks,
+    qidian,
     truyendich,
     truyenhoan,
     uukanshu,
