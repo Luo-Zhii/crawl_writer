@@ -133,6 +133,162 @@ def _page_title(html: str) -> str:
     return match.group(1).strip() if match else "(no title)"
 
 
+crawl_app = typer.Typer(help="Inspect a site through its adapter", no_args_is_help=True)
+app.add_typer(crawl_app, name="crawl")
+
+
+def _run_with_source(url: str, action):
+    """Resolve the adapter for ``url`` and run ``action(source)``."""
+    import asyncio
+
+    from app.fetch import Blocked, FetchError, HttpFetcher
+    from app.sources import SourceError, UnsupportedSite, resolve
+
+    setup_logging()
+
+    async def run() -> int:
+        fetcher = HttpFetcher()
+        try:
+            source = resolve(url, fetcher)
+        except UnsupportedSite as exc:
+            typer.secho(str(exc), fg=typer.colors.RED)
+            await fetcher.aclose()
+            return 3
+
+        typer.secho(f"source   {source.key} ({source.name})", fg=typer.colors.CYAN)
+        try:
+            await action(source)
+        except Blocked as exc:
+            typer.secho(f"BLOCKED  {exc.reason}", fg=typer.colors.RED)
+            typer.echo("hint     needs the browser fetcher, a proxy, or cookies")
+            return 2
+        except SourceError as exc:
+            typer.secho(f"LAYOUT   {exc}", fg=typer.colors.YELLOW)
+            typer.echo("hint     the site markup changed; selectors need updating")
+            return 4
+        except FetchError as exc:
+            typer.secho(f"FAILED   {exc}", fg=typer.colors.RED)
+            return 1
+        finally:
+            await fetcher.aclose()
+        return 0
+
+    raise typer.Exit(asyncio.run(run()))
+
+
+@crawl_app.command("info")
+def crawl_info(url: str = typer.Argument(..., help="Novel page URL")) -> None:
+    """Print a novel's metadata as the adapter sees it."""
+
+    async def action(source) -> None:
+        info = await source.novel_info(url)
+        typer.secho(f"title    {info.title}", fg=typer.colors.GREEN)
+        typer.echo(f"author   {info.author}")
+        typer.echo(f"status   {info.status.value}")
+        typer.echo(f"lang     {info.lang.value}")
+        typer.echo(f"genres   {', '.join(info.genres) or '-'}")
+        typer.echo(f"cover    {info.cover_url or '-'}")
+        typer.echo(f"url      {info.url}")
+        if info.description:
+            typer.echo(f"desc     {info.description[:200]}")
+
+    _run_with_source(url, action)
+
+
+@crawl_app.command("chapters")
+def crawl_chapters(
+    url: str = typer.Argument(..., help="Novel page URL"),
+    show: int = typer.Option(5, help="How many chapters to list"),
+) -> None:
+    """List the chapters the adapter can see, including any numbering gaps."""
+
+    async def action(source) -> None:
+        chapters = await source.chapter_list(url)
+        typer.secho(f"found    {len(chapters)} chapters", fg=typer.colors.GREEN)
+        if chapters:
+            numbers = [c.number for c in chapters]
+            typer.echo(f"range    {numbers[0]} .. {numbers[-1]}")
+            missing = sorted(set(range(numbers[0], numbers[-1] + 1)) - set(numbers))
+            if missing:
+                typer.echo(f"gaps     {len(missing)} missing, e.g. {missing[:8]}")
+        for chapter in chapters[:show]:
+            typer.echo(f"  {chapter.number:>5}  {chapter.title[:60]}")
+            typer.echo(f"         {chapter.url}")
+
+    _run_with_source(url, action)
+
+
+@crawl_app.command("chapter")
+def crawl_chapter(
+    url: str = typer.Argument(..., help="Chapter URL"),
+    head: int = typer.Option(500, help="How many characters to print"),
+) -> None:
+    """Fetch one chapter and print the cleaned text."""
+
+    async def action(source) -> None:
+        from app.sources.text import looks_like_content
+
+        text = await source.chapter_content(url)
+        ok = looks_like_content(text)
+        colour = typer.colors.GREEN if ok else typer.colors.YELLOW
+        typer.secho(f"length   {len(text)} chars (usable: {ok})", fg=colour)
+        paragraphs = [p for p in text.split("\n\n") if p.strip()]
+        typer.echo(f"paras    {len(paragraphs)}")
+        typer.echo("-" * 60)
+        typer.echo(text[:head])
+
+    _run_with_source(url, action)
+
+
+@crawl_app.command("search")
+def crawl_search(
+    query: str = typer.Argument(..., help="Novel name to look for"),
+    site: str = typer.Option("truyenhoan", help="Source key to search"),
+    limit: int = typer.Option(10, help="Max results"),
+) -> None:
+    """Search one site by name."""
+    import asyncio
+
+    from app.fetch import FetchError, HttpFetcher
+    from app.sources import get_by_key
+
+    setup_logging()
+
+    source_cls = get_by_key(site)
+    if source_cls is None:
+        typer.secho(f"Unknown source: {site}", fg=typer.colors.RED)
+        raise typer.Exit(3)
+
+    async def run() -> int:
+        fetcher = HttpFetcher()
+        try:
+            results = await source_cls(fetcher).search(query, limit=limit)
+        except FetchError as exc:
+            typer.secho(f"FAILED   {exc}", fg=typer.colors.RED)
+            return 1
+        finally:
+            await fetcher.aclose()
+
+        typer.secho(f"{len(results)} results", fg=typer.colors.GREEN)
+        for ref in results:
+            typer.echo(f"  {ref.title}")
+            typer.echo(f"    {ref.url}  ({ref.author or '-'})")
+        return 0
+
+    raise typer.Exit(asyncio.run(run()))
+
+
+@app.command("sources")
+def list_sources() -> None:
+    """Show every registered adapter."""
+    from app.sources import all_sources
+
+    for source_cls in sorted(all_sources(), key=lambda c: c.key):
+        browser = " [needs browser]" if source_cls.needs_browser else ""
+        typer.echo(f"{source_cls.key:14} {source_cls.lang.value}  "
+                   f"{', '.join(source_cls.domains)}{browser}")
+
+
 @app.command("paths")
 def show_paths() -> None:
     """Print where data is stored. Handy when something looks missing."""

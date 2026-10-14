@@ -60,7 +60,7 @@ make lint   # ruff + tsc
 - [x] Scaffold backend + frontend
 - [x] DB và storage layer
 - [x] Fetcher (retry, rate limit, phát hiện bị chặn)
-- [ ] Source adapter cho từng site
+- [x] Source adapter cho từng site (đang có: truyenhoan)
 - [ ] Crawl pipeline có resume
 - [ ] Xuất TXT / JSON / EPUB
 - [ ] UI quản lý crawl và thư viện
@@ -94,3 +94,38 @@ cd backend
 ../.venv/bin/python -m app.cli db init               # tạo bảng
 ../.venv/bin/python -m app.cli db seed-demo          # tạo một truyện giả để thử API
 ```
+
+## Thêm một site mới
+
+Mỗi site là một adapter trong `backend/app/sources/`, cùng chung một contract
+(`Source` trong `app/sources/base.py`). Các bước:
+
+1. Dò xem site có truy cập được không:
+
+   ```bash
+   cd backend
+   ../.venv/bin/python -m app.cli fetch "https://site.example/" --head 0
+   ```
+
+   Nếu báo `BLOCKED` thì đánh dấu `needs_browser = True` trên adapter.
+
+2. Viết adapter, khai báo `key`, `name`, `domains`, `lang`, rồi thêm
+   `@register`. Import nó trong `app/sources/__init__.py` để decorator chạy.
+
+3. Thêm fixture trong `backend/tests/fixtures/<key>/`: dựng lại **cấu trúc**
+   markup của site (tag, class, id, dạng URL) nhưng dùng nội dung tự viết.
+   Đừng commit nội dung truyện thật vào repo.
+
+4. Kiểm tra bằng CLI:
+
+   ```bash
+   ../.venv/bin/python -m app.cli sources
+   ../.venv/bin/python -m app.cli crawl info     "<url truyện>"
+   ../.venv/bin/python -m app.cli crawl chapters "<url truyện>" --show 3
+   ../.venv/bin/python -m app.cli crawl chapter  "<url chương>" --head 300
+   ../.venv/bin/python -m app.cli crawl search   "tên truyện"
+   ```
+
+CLI phân biệt rõ nguyên nhân lỗi: `BLOCKED` là site chặn (cần browser, proxy
+hoặc cookie), `LAYOUT` là markup đổi nên selector cần sửa, `FAILED` là lỗi
+mạng.
