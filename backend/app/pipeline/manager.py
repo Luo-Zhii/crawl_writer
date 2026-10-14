@@ -17,7 +17,10 @@ from app.core.settings import Settings, get_settings
 from app.db.models import Job, JobStatus, JobType, utcnow
 from app.db.repository import JobRepository
 from app.db.session import session_scope
+from app.db.settings_store import SettingsStore
+from app.fetch.browser import BrowserFetcher
 from app.fetch.http import HttpFetcher
+from app.fetch.smart import SmartFetcher
 from app.pipeline.control import JobControl
 from app.pipeline.crawler import CrawlRunner
 from app.pipeline.events import EventHub, Progress
@@ -45,7 +48,8 @@ class JobManager:
         self._queue: asyncio.Queue[int] = asyncio.Queue()
         self._tasks: list[asyncio.Task[None]] = []
         self._controls: dict[int, JobControl] = {}
-        self._owned_fetcher: HttpFetcher | None = None
+        self._owned_fetcher: SmartFetcher | None = None
+        self._effective_settings: Settings | None = None
         self._running = False
 
     # --- lifecycle ---------------------------------------------------------
@@ -213,13 +217,43 @@ class JobManager:
     def _runner(self) -> CrawlRunner:
         if self._runner_factory is not None:
             return self._runner_factory()
+
         if self._owned_fetcher is None:
-            # One client for the whole process keeps connections warm and the
-            # per-host throttle shared across jobs.
-            self._owned_fetcher = HttpFetcher(settings=self.settings)
+            # Built once per process: connections stay warm, the per-host
+            # throttle is shared across jobs, and a browser launched for one
+            # protected site is reused by the next.
+            with session_scope() as session:
+                store = SettingsStore(session)
+                settings = store.effective_settings()
+                cookies = store.playwright_cookies()
+                browser_enabled = store.browser_enabled
+
+            self._owned_fetcher = SmartFetcher(
+                http=HttpFetcher(settings=settings),
+                browser=BrowserFetcher(settings=settings, cookies=cookies)
+                if browser_enabled
+                else None,
+                settings=settings,
+                browser_enabled=browser_enabled,
+            )
+            self._effective_settings = settings
+
         return CrawlRunner(
-            fetcher=self._owned_fetcher, hub=self.hub, settings=self.settings
+            fetcher=self._owned_fetcher,
+            hub=self.hub,
+            settings=self._effective_settings or self.settings,
         )
+
+    async def reload_fetcher(self) -> None:
+        """Drop the cached fetcher so saved settings take effect.
+
+        Called after the Settings page saves: the next job builds a fresh
+        fetcher with the new proxy, cookies and limits.
+        """
+        fetcher, self._owned_fetcher = self._owned_fetcher, None
+        self._effective_settings = None
+        if fetcher is not None:
+            await fetcher.aclose()
 
     def _set_status(self, job_id: int, status: JobStatus) -> None:
         with session_scope() as session:

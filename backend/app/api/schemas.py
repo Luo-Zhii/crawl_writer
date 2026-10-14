@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from app.db.models import ChapterStatus, JobStatus, JobType, Lang, NovelStatus
 
@@ -134,6 +134,40 @@ class SourceInfo(BaseModel):
     domains: list[str]
     lang: Lang
     needs_browser: bool
+
+
+class SettingsRead(BaseModel):
+    """Runtime settings, with secrets reduced to a hint."""
+
+    proxy: str | None = None
+    browser_enabled: bool = True
+    per_domain_delay: float
+    per_domain_concurrency: int
+    request_timeout: float
+    chapter_retry_limit: int
+    #: Cookie header strings keyed by domain.
+    cookies: dict[str, str] = {}
+    #: Provider -> masked key, or None when unset.
+    api_keys: dict[str, str | None] = {}
+
+
+class SettingsUpdate(BaseModel):
+    """Partial update. Only the fields sent are changed."""
+
+    proxy: str | None = None
+    browser_enabled: bool | None = None
+    per_domain_delay: float | None = Field(None, ge=0, le=30)
+    per_domain_concurrency: int | None = Field(None, ge=1, le=16)
+    request_timeout: float | None = Field(None, ge=5, le=180)
+    chapter_retry_limit: int | None = Field(None, ge=0, le=10)
+    cookies: dict[str, str] | None = None
+    #: Provider -> key, or null to clear it.
+    api_keys: dict[str, str | None] | None = None
+
+
+class BrowserCheck(BaseModel):
+    available: bool
+    detail: str
 
 
 class PreviewRequest(BaseModel):

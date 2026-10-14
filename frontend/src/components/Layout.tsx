@@ -19,6 +19,7 @@ export default function Layout() {
             </NavLink>
             <NavLink to="/add">Thêm truyện</NavLink>
             <NavLink to="/jobs">Tiến trình</NavLink>
+            <NavLink to="/settings">Cài đặt</NavLink>
           </nav>
 
           <button

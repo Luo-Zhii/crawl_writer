@@ -22,15 +22,16 @@ export function renderPage(ui: ReactElement, { route = "/" } = {}) {
   };
 }
 
-type Handler = (url: string, init?: RequestInit) => unknown;
+export type StubHandler = (url: string, init?: RequestInit) => unknown;
 
 /**
  * Stub `fetch` with a path -> payload map.
  *
  * Keys are matched as substrings of the request URL, so "/api/novels" covers
- * the query string the client appends.
+ * the query string the client appends. A value may be a handler when the
+ * response depends on the method or body.
  */
-export function stubFetch(routes: Record<string, unknown | Handler>) {
+export function stubFetch(routes: Record<string, unknown | StubHandler>) {
   const calls: { url: string; method: string }[] = [];
 
   const impl = async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -50,7 +51,7 @@ export function stubFetch(routes: Record<string, unknown | Handler>) {
     }
 
     const entry = routes[match];
-    const payload = typeof entry === "function" ? (entry as Handler)(url, init) : entry;
+    const payload = typeof entry === "function" ? (entry as StubHandler)(url, init) : entry;
 
     if (payload instanceof Response) return payload;
 

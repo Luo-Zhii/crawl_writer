@@ -86,6 +86,12 @@ def fetch_url(
     url: str = typer.Argument(..., help="Page to fetch"),
     encoding: str | None = typer.Option(None, help="Force a charset, e.g. gb18030"),
     head: int = typer.Option(600, help="How many characters of the body to print"),
+    browser: bool = typer.Option(
+        False, "--browser", help="Fetch with headless Chromium instead of plain HTTP"
+    ),
+    smart: bool = typer.Option(
+        False, "--smart", help="Try plain HTTP, fall back to the browser if blocked"
+    ),
 ) -> None:
     """Fetch one page and report what came back, or why it did not.
 
@@ -94,12 +100,17 @@ def fetch_url(
     """
     import asyncio
 
-    from app.fetch import Blocked, FetchError, HttpFetcher
+    from app.fetch import Blocked, BrowserFetcher, FetchError, HttpFetcher, SmartFetcher
 
     setup_logging()
 
     async def run() -> int:
-        fetcher = HttpFetcher()
+        if browser:
+            fetcher = BrowserFetcher()
+        elif smart:
+            fetcher = SmartFetcher()
+        else:
+            fetcher = HttpFetcher()
         try:
             resp = await fetcher.get(url, encoding=encoding)
         except Blocked as exc:

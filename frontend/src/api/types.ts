@@ -97,6 +97,28 @@ export interface Paged<T> {
   offset: number;
 }
 
+export interface AppSettings {
+  proxy: string | null;
+  browser_enabled: boolean;
+  per_domain_delay: number;
+  per_domain_concurrency: number;
+  request_timeout: number;
+  chapter_retry_limit: number;
+  /** Cookie header strings keyed by domain. */
+  cookies: Record<string, string>;
+  /** Provider -> masked key, or null when unset. */
+  api_keys: Record<string, string | null>;
+}
+
+export type SettingsPatch = Partial<
+  Omit<AppSettings, "api_keys"> & { api_keys: Record<string, string | null> }
+>;
+
+export interface BrowserCheck {
+  available: boolean;
+  detail: string;
+}
+
 /** One frame from the job event stream. */
 export interface ProgressEvent {
   job_id: number;

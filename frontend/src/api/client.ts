@@ -2,6 +2,8 @@
 // mobile client can reuse the exact same endpoints later.
 
 import type {
+  AppSettings,
+  BrowserCheck,
   ChapterStatus,
   ChapterSummary,
   ExportFormat,
@@ -11,6 +13,7 @@ import type {
   NovelSummary,
   Paged,
   Preview,
+  SettingsPatch,
   SourceInfo,
 } from "./types";
 
@@ -142,3 +145,15 @@ export const resumeJob = (id: number) => api.post<Job>(`/jobs/${id}/resume`);
 export const cancelJob = (id: number) => api.post<Job>(`/jobs/${id}/cancel`);
 
 export const jobEventsUrl = (id: number) => `${BASE}/jobs/${id}/events`;
+
+// --- settings --------------------------------------------------------------
+
+export const getSettings = () => api.get<AppSettings>("/settings");
+
+export const saveSettings = (changes: SettingsPatch) =>
+  request<AppSettings>("/settings", { method: "PUT", body: JSON.stringify(changes) });
+
+export const deleteCookie = (domain: string) =>
+  api.delete<AppSettings>(`/settings/cookies/${encodeURIComponent(domain)}`);
+
+export const checkBrowser = () => api.post<BrowserCheck>("/settings/browser-check");

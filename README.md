@@ -64,7 +64,7 @@ make lint   # ruff + tsc
 - [x] Crawl pipeline có resume
 - [x] Xuất TXT / JSON / EPUB
 - [x] UI quản lý crawl và thư viện
-- [ ] Playwright cho site Cloudflare
+- [x] Playwright cho site Cloudflare (xem phần giới hạn bên dưới)
 - [ ] Adapter site Trung + dịch sang Việt
 - [ ] Trình đọc trong web
 - [ ] Theo dõi và tự cập nhật chương mới
@@ -215,7 +215,7 @@ Khảo sát trực tiếp (tháng 10/2026), gần 50 domain. Kết quả không 
 | metruyencv.net | đóng cửa, cùng thông báo như trên |
 | metruyencv.com | sống nhưng Cloudflare chặn, cần Playwright |
 | bachngocsach.cc | "BNS Reader ngừng hoạt động" |
-| truyenchu.com.vn | sống nhưng danh sách chương render bằng JS, cần Playwright |
+| truyenchu.com.vn | sống, danh sách chương **có** trong HTML nhưng không phải thẻ `<a href>` nên cần parse riêng |
 | webtruyen.com, truyenviet.vn | sống, chưa khảo sát xong cấu trúc |
 | nhattruyen.com | domain đang được bán |
 | 4vn.eu, hoasontrang.us | domain đã đổi sang mục đích khác |
@@ -232,3 +232,59 @@ cd backend
 Hai site cùng dùng chung template (họ "truyenfull") nên phần đọc HTML nằm ở
 `app/sources/vi_truyenfull.py`, mỗi adapter chỉ khai báo dạng URL riêng. Thêm
 một site cùng họ chỉ mất khoảng 20 dòng.
+
+## Trình duyệt nền và site bị chặn
+
+Một số site trả về trang kiểm tra JavaScript thay vì nội dung. Request thường
+không thể vượt qua, nên có thêm fetcher chạy Chromium ẩn.
+
+Cài thêm (không bắt buộc, chỉ cần khi gặp site như vậy):
+
+```bash
+uv pip install --python .venv/bin/python -e './backend[browser]'
+.venv/bin/python -m playwright install chromium
+```
+
+Thử một URL:
+
+```bash
+cd backend
+../.venv/bin/python -m app.cli fetch "<url>" --head 0            # http thường
+../.venv/bin/python -m app.cli fetch "<url>" --browser --head 0  # Chromium
+../.venv/bin/python -m app.cli fetch "<url>" --smart --head 0    # http, chặn thì chuyển browser
+```
+
+Khi crawl, hệ thống tự chọn: site nào adapter đã khai `needs_browser` thì dùng
+Chromium luôn, còn lại thử HTTP trước. Nếu HTTP bị chặn mà browser vào được thì
+host đó được ghi nhớ, các chương sau khỏi phải thử HTTP rồi bị chặn lại. Browser
+đắt hơn HTTP khoảng trăm lần nên chỉ dùng khi cần.
+
+### Giới hạn thật, đã kiểm tra
+
+**Chromium ẩn không vượt được Cloudflare.** Thử trên metruyencv.com: browser chờ
+hết 25 giây mà trang kiểm tra vẫn không chịu qua. Cloudflare nhận ra đây là
+trình duyệt tự động. Đây không phải lỗi cấu hình, và tool này không đi theo
+hướng cố né cơ chế chống bot.
+
+Cách dùng được cho những site đó là **dán cookie từ trình duyệt của chính bạn**:
+mở site bằng Chrome/Firefox như bình thường, qua được trang kiểm tra, rồi copy
+cookie trong DevTools (Network → chọn một request → Request Headers → Cookie) và
+dán vào trang **Cài đặt**. Cookie được dùng cho cả HTTP lẫn browser. Cookie
+Cloudflare thường sống vài ngày nên sẽ phải dán lại.
+
+Trình duyệt nền vẫn hữu ích cho site chỉ render nội dung bằng JavaScript —
+trường hợp này nó hoạt động tốt và có test chứng minh.
+
+## Cài đặt trong app
+
+Trang **Cài đặt** lưu vào database nên đổi là có hiệu lực ngay, không cần
+restart:
+
+- **Proxy** cho site bị chặn theo vùng.
+- **Giãn cách và số request song song** mỗi site. Hạ giãn cách xuống thì nhanh
+  hơn nhưng dễ bị chặn.
+- **Timeout** và **số lần thử lại mỗi chương**.
+- **Bật/tắt trình duyệt nền**, kèm nút kiểm tra xem Chromium đã cài chưa.
+- **Cookie theo từng site**.
+- **API key** cho engine dịch bằng LLM. Key chỉ được lưu ở máy bạn và không bao
+  giờ trả về qua API — trang cài đặt chỉ hiện 4 ký tự cuối để phân biệt.
