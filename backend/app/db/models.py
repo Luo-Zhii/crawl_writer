@@ -82,6 +82,9 @@ class Novel(SQLModel, table=True):
     # Follow = re-check periodically for new chapters.
     followed: bool = Field(default=False)
     last_checked_at: datetime | None = None
+    #: Chapters found by the last automatic check and not yet acknowledged.
+    #: Drives the "new chapters" badge; cleared when the user dismisses it.
+    new_chapters: int = Field(default=0)
 
     # Reading position, kept server-side rather than in the browser so a
     # phone and a laptop pick up where the other left off.

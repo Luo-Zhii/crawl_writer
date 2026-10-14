@@ -43,6 +43,16 @@ export function NovelStatusBadge({ status }: { status: NovelStatus }) {
   );
 }
 
+/** "N chương mới" marker. Renders nothing at zero so callers can stay dumb. */
+export function NewChaptersBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <Badge tone="accent" title="Số chương tìm thấy từ lần bạn xem gần nhất">
+      +{count} chương mới
+    </Badge>
+  );
+}
+
 const CHAPTER_LABELS: Record<ChapterStatus, { text: string; tone: "neutral" | "ok" | "warn" | "err" }> = {
   pending: { text: "Chưa tải", tone: "neutral" },
   done: { text: "Đã tải", tone: "ok" },

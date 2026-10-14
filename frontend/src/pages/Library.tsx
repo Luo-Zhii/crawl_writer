@@ -3,7 +3,14 @@ import { Link } from "react-router-dom";
 
 import { deleteNovel, listNovels, startUpdate } from "../api/client";
 import type { NovelSummary } from "../api/types";
-import { Empty, ErrorBox, NovelStatusBadge, Spinner, formatDate } from "../components/Bits";
+import {
+  Empty,
+  ErrorBox,
+  NewChaptersBadge,
+  NovelStatusBadge,
+  Spinner,
+  formatDate,
+} from "../components/Bits";
 
 export default function Library() {
   const queryClient = useQueryClient();
@@ -100,6 +107,7 @@ function NovelRow({
         <p className="muted">{novel.author ?? "Chưa rõ tác giả"}</p>
         <p className="novel-meta">
           <NovelStatusBadge status={novel.status} />
+          <NewChaptersBadge count={novel.new_chapters} />
           <span className="muted">{novel.source}</span>
           {novel.lang === "zh" && <span className="muted">· raw Trung</span>}
         </p>

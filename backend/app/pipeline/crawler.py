@@ -138,6 +138,11 @@ class CrawlRunner:
         added = self._sync_chapters(novel_id, refs)
         log.info("job %s: %d chapters listed, %d new", job_id, len(refs), added)
 
+        # Only an update reveals *new* chapters. On a first crawl every
+        # chapter is new, which would badge the whole library on day one.
+        if added and job_type is JobType.update:
+            self._bump_new_chapters(novel_id, added)
+
         pending = self._pending_chapters(novel_id, refs, full_refresh=job_type is JobType.crawl)
         counts = self._status_counts(novel_id)
 
@@ -355,6 +360,18 @@ class CrawlRunner:
             if new_rows:
                 repo.add_many(new_rows)
             return len(new_rows)
+
+    def _bump_new_chapters(self, novel_id: int, added: int) -> None:
+        """Add to the unseen counter.
+
+        Incremented rather than overwritten so two checks between visits add
+        up instead of the second one hiding the first.
+        """
+        with session_scope() as session:
+            repo = NovelRepository(session)
+            novel = repo.get(novel_id)
+            if novel is not None:
+                repo.update(novel, new_chapters=novel.new_chapters + added)
 
     def _pending_chapters(
         self, novel_id: int, refs: list[ChapterRef], *, full_refresh: bool

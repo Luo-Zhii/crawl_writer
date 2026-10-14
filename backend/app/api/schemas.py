@@ -42,6 +42,8 @@ class NovelSummary(BaseModel):
     status: NovelStatus
     translate_enabled: bool
     followed: bool
+    #: Chapters discovered since the user last looked at this novel.
+    new_chapters: int = 0
     last_read_chapter: int | None = None
     created_at: datetime
     updated_at: datetime
@@ -166,6 +168,8 @@ class SettingsRead(BaseModel):
     per_domain_concurrency: int
     request_timeout: float
     chapter_retry_limit: int
+    follow_enabled: bool = True
+    follow_interval_hours: int = 6
     #: Cookie header strings keyed by domain.
     cookies: dict[str, str] = {}
     #: Provider -> masked key, or None when unset.
@@ -181,6 +185,9 @@ class SettingsUpdate(BaseModel):
     per_domain_concurrency: int | None = Field(None, ge=1, le=16)
     request_timeout: float | None = Field(None, ge=5, le=180)
     chapter_retry_limit: int | None = Field(None, ge=0, le=10)
+    follow_enabled: bool | None = None
+    #: Capped at a week: longer than that and the user may as well crawl by hand.
+    follow_interval_hours: int | None = Field(None, ge=1, le=168)
     cookies: dict[str, str] | None = None
     #: Provider -> key, or null to clear it.
     api_keys: dict[str, str | None] | None = None
@@ -189,6 +196,29 @@ class SettingsUpdate(BaseModel):
 class BrowserCheck(BaseModel):
     available: bool
     detail: str
+
+
+class FollowStatus(BaseModel):
+    """What the auto-update scheduler is doing right now."""
+
+    enabled: bool
+    interval_hours: int
+    #: False when the setting is on but the scheduler is not actually ticking.
+    running: bool
+    next_run_at: datetime | None = None
+    followed_count: int
+    #: Novels with unseen chapters, summed across the library.
+    new_chapters: int
+
+
+class FollowCheckResult(BaseModel):
+    """Outcome of a manual "check now"."""
+
+    #: Job ids queued, one per novel that was due.
+    job_ids: list[int] = []
+    #: Followed novels considered. Larger than ``job_ids`` when some were
+    #: checked recently or already have a job in flight.
+    considered: int = 0
 
 
 class GlossaryTermRead(BaseModel):

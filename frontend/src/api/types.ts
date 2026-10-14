@@ -23,6 +23,8 @@ export interface NovelSummary {
   status: NovelStatus;
   translate_enabled: boolean;
   followed: boolean;
+  /** Chapters found since the user last opened this novel. */
+  new_chapters: number;
   last_read_chapter: number | null;
   created_at: string;
   updated_at: string;
@@ -105,6 +107,8 @@ export interface AppSettings {
   per_domain_concurrency: number;
   request_timeout: number;
   chapter_retry_limit: number;
+  follow_enabled: boolean;
+  follow_interval_hours: number;
   /** Cookie header strings keyed by domain. */
   cookies: Record<string, string>;
   /** Provider -> masked key, or null when unset. */
@@ -154,3 +158,17 @@ export interface ProgressEvent {
 }
 
 export type ExportFormat = "epub" | "txt" | "json";
+
+export interface FollowStatus {
+  enabled: boolean;
+  interval_hours: number;
+  running: boolean;
+  next_run_at: string | null;
+  followed_count: number;
+  new_chapters: number;
+}
+
+export interface FollowCheckResult {
+  job_ids: number[];
+  considered: number;
+}

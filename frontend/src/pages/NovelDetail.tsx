@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import {
@@ -7,6 +7,7 @@ import {
   exportUrl,
   getNovel,
   listChapters,
+  markNovelSeen,
   startTranslation,
   startUpdate,
   updateNovel,
@@ -57,6 +58,26 @@ export default function NovelDetail() {
     queryClient.invalidateQueries({ queryKey: ["novel", novelId] });
     queryClient.invalidateQueries({ queryKey: ["novels"] });
   };
+
+  // Opening the detail page *is* seeing the novel, so clear the badge here
+  // rather than adding a "mark as read" button the user has to find.
+  const unseen = novel.data?.new_chapters ?? 0;
+  useEffect(() => {
+    if (unseen <= 0) return;
+    let cancelled = false;
+    markNovelSeen(novelId)
+      .then(() => {
+        if (!cancelled) {
+          queryClient.invalidateQueries({ queryKey: ["novels"] });
+          queryClient.invalidateQueries({ queryKey: ["follow-status"] });
+        }
+      })
+      // A failed badge clear is not worth an error box; the next visit retries.
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [novelId, unseen, queryClient]);
 
   const follow = useMutation({
     mutationFn: (followed: boolean) => updateNovel(novelId, { followed }),

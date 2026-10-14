@@ -32,6 +32,12 @@ async def write_settings(
     if manager is not None:
         await manager.reload_fetcher()
 
+    # The scheduler caches its interval in a trigger, so a changed interval
+    # only takes effect if we rebuild the job.
+    follow = getattr(request.app.state, "follow_scheduler", None)
+    if follow is not None:
+        follow.reload()
+
     return SettingsRead(**store.as_dict())
 
 

@@ -404,3 +404,50 @@ async def test_totals_match_the_chapter_list(chapters: int):
     await make_runner(FakeSource(chapters=chapters)).run(job_id, JobControl())
 
     assert job_row(job_id).total == chapters
+
+
+# --- the new-chapter counter -----------------------------------------------
+
+
+def update_job(novel_id: int) -> int:
+    with session_scope() as session:
+        job = JobRepository(session).create(
+            type=JobType.update, novel_id=novel_id, params={}
+        )
+        return job.id
+
+
+async def test_a_first_crawl_does_not_count_as_new_chapters():
+    """Every chapter is new on day one, which would badge the whole library."""
+    await make_runner(FakeSource(chapters=3)).run(new_job(), JobControl())
+
+    assert only_novel().new_chapters == 0
+
+
+async def test_an_update_counts_the_chapters_it_discovered():
+    await make_runner(FakeSource(chapters=2)).run(new_job(), JobControl())
+    novel = only_novel()
+
+    await make_runner(FakeSource(chapters=5)).run(update_job(novel.id), JobControl())
+
+    assert only_novel().new_chapters == 3
+
+
+async def test_an_update_with_nothing_new_leaves_the_counter_alone():
+    await make_runner(FakeSource(chapters=2)).run(new_job(), JobControl())
+    novel = only_novel()
+
+    await make_runner(FakeSource(chapters=2)).run(update_job(novel.id), JobControl())
+
+    assert only_novel().new_chapters == 0
+
+
+async def test_successive_updates_add_up():
+    """Two checks between visits must not have the second hide the first."""
+    await make_runner(FakeSource(chapters=1)).run(new_job(), JobControl())
+    novel = only_novel()
+
+    await make_runner(FakeSource(chapters=3)).run(update_job(novel.id), JobControl())
+    await make_runner(FakeSource(chapters=4)).run(update_job(novel.id), JobControl())
+
+    assert only_novel().new_chapters == 3

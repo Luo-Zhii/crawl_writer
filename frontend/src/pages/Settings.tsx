@@ -1,9 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
-import { checkBrowser, deleteCookie, getSettings, saveSettings } from "../api/client";
+import {
+  checkBrowser,
+  checkFollowNow,
+  deleteCookie,
+  getFollowStatus,
+  getSettings,
+  saveSettings,
+} from "../api/client";
 import type { AppSettings, BrowserCheck, SettingsPatch } from "../api/types";
-import { Badge, ErrorBox, Spinner } from "../components/Bits";
+import { Badge, ErrorBox, Spinner, formatDate } from "../components/Bits";
+
+const INTERVALS = [1, 3, 6, 12, 24, 72, 168];
+
+function intervalLabel(hours: number): string {
+  if (hours < 24) return `${hours} giờ`;
+  if (hours === 24) return "1 ngày";
+  return `${hours / 24} ngày`;
+}
 
 const PROVIDERS = [
   { key: "gemini", label: "Gemini" },
@@ -45,6 +60,15 @@ export default function Settings() {
       {save.error && <ErrorBox error={save.error} />}
 
       <LimitsForm settings={data} onSave={(patch) => save.mutate(patch)} busy={save.isPending} />
+
+      <h2 className="section-title">Tự động cập nhật</h2>
+      <p className="muted small">
+        Truyện bạn theo dõi sẽ được kiểm tra chương mới theo chu kỳ. Việc kiểm
+        tra chỉ tạo tiến trình cập nhật, nên nó không bao giờ chen ngang truyện
+        đang tải.
+      </p>
+
+      <FollowSection settings={data} onSave={(patch) => save.mutate(patch)} busy={save.isPending} />
 
       <h2 className="section-title">Trình duyệt nền</h2>
       <p className="muted small">
@@ -108,6 +132,87 @@ export default function Settings() {
         busy={save.isPending}
       />
     </section>
+  );
+}
+
+function FollowSection({
+  settings,
+  onSave,
+  busy,
+}: {
+  settings: AppSettings;
+  onSave: (patch: SettingsPatch) => void;
+  busy: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const status = useQuery({ queryKey: ["follow-status"], queryFn: getFollowStatus });
+
+  const checkNow = useMutation({
+    mutationFn: checkFollowNow,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["follow-status"] });
+    },
+  });
+
+  return (
+    <>
+      <label className="check-row">
+        <input
+          type="checkbox"
+          checked={settings.follow_enabled}
+          onChange={(event) => onSave({ follow_enabled: event.target.checked })}
+        />
+        Tự động kiểm tra chương mới
+      </label>
+
+      <label>
+        Kiểm tra mỗi
+        <select
+          value={settings.follow_interval_hours}
+          aria-label="Chu kỳ kiểm tra"
+          disabled={busy}
+          onChange={(event) =>
+            onSave({ follow_interval_hours: Number(event.target.value) })
+          }
+        >
+          {INTERVALS.map((hours) => (
+            <option key={hours} value={hours}>
+              {intervalLabel(hours)}
+            </option>
+          ))}
+        </select>
+        <span className="muted small">
+          Truyện đang ra mỗi tuần chỉ thêm vài chương, nên kiểm tra quá dày chỉ
+          tốn request.
+        </span>
+      </label>
+
+      {status.data && (
+        <p className="muted small">
+          Đang theo dõi {status.data.followed_count} truyện
+          {status.data.new_chapters > 0 && ` · ${status.data.new_chapters} chương mới chưa xem`}
+          {status.data.running
+            ? ` · lần kiểm tra tới ${formatDate(status.data.next_run_at)}`
+            : " · bộ hẹn giờ đang tắt"}
+        </p>
+      )}
+
+      <p>
+        <button type="button" onClick={() => checkNow.mutate()} disabled={checkNow.isPending}>
+          {checkNow.isPending ? "Đang kiểm tra…" : "Kiểm tra ngay"}
+        </button>
+      </p>
+
+      {checkNow.data && (
+        <div className="box muted">
+          {checkNow.data.job_ids.length > 0
+            ? `Đã tạo ${checkNow.data.job_ids.length} tiến trình cập nhật.`
+            : `Đã xem ${checkNow.data.considered} truyện, chưa truyện nào tới hạn.`}
+        </div>
+      )}
+      {checkNow.error && <ErrorBox error={checkNow.error} />}
+    </>
   );
 }
 

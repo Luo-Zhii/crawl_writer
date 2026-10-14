@@ -87,3 +87,37 @@ describe("Library", () => {
     });
   });
 });
+
+describe("Library new-chapter badge", () => {
+  it("marks a novel that gained chapters", async () => {
+    stubFetch({ "/api/novels": paged([novel({ new_chapters: 4 })]) });
+
+    renderPage(<Library />);
+
+    expect(await screen.findByText("+4 chương mới")).toBeInTheDocument();
+  });
+
+  it("shows no badge when nothing is new", async () => {
+    stubFetch({ "/api/novels": paged([novel({ new_chapters: 0 })]) });
+
+    renderPage(<Library />);
+    await screen.findByText("Kiếm Khách Vô Danh");
+
+    // Narrow regex: the "Tải chương mới" button also contains "chương mới".
+    expect(screen.queryByText(/^\+\d+ chương mới$/)).not.toBeInTheDocument();
+  });
+
+  it("badges only the novels that changed", async () => {
+    stubFetch({
+      "/api/novels": paged([
+        novel({ id: 1, title: "Có mới", new_chapters: 2 }),
+        novel({ id: 2, title: "Không mới", new_chapters: 0 }),
+      ]),
+    });
+
+    renderPage(<Library />);
+    await screen.findByText("Có mới");
+
+    expect(screen.getAllByText(/^\+\d+ chương mới$/)).toHaveLength(1);
+  });
+});

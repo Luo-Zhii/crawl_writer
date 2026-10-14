@@ -90,6 +90,8 @@ export const novel = (overrides: Record<string, unknown> = {}) => ({
   status: "ongoing",
   translate_enabled: false,
   followed: false,
+  new_chapters: 0,
+  last_read_chapter: null,
   created_at: "2026-10-14T10:00:00Z",
   updated_at: "2026-10-14T12:00:00Z",
   ...overrides,

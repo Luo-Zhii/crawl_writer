@@ -33,6 +33,8 @@ REQUEST_TIMEOUT = "request_timeout"
 CHAPTER_RETRY_LIMIT = "chapter_retry_limit"
 COOKIES = "cookies"
 API_KEYS = "api_keys"
+FOLLOW_ENABLED = "follow_enabled"
+FOLLOW_INTERVAL_HOURS = "follow_interval_hours"
 
 #: Keys whose value must never leave the server.
 SECRET_KEYS = frozenset({API_KEYS})
@@ -73,6 +75,21 @@ class SettingsStore:
     @property
     def chapter_retry_limit(self) -> int:
         return int(self.repo.get(CHAPTER_RETRY_LIMIT, self.base.chapter_retry_limit))
+
+    @property
+    def follow_enabled(self) -> bool:
+        """Whether followed novels get checked for new chapters on a timer.
+
+        On by default: following a novel and still having to press a button
+        would make the flag pointless.
+        """
+        return bool(self.repo.get(FOLLOW_ENABLED, True))
+
+    @property
+    def follow_interval_hours(self) -> int:
+        """How often to check. Ongoing novels post a few chapters a week, so
+        anything under an hour is just extra traffic for the site."""
+        return max(1, int(self.repo.get(FOLLOW_INTERVAL_HOURS, 6)))
 
     @property
     def translate_provider(self) -> str:
@@ -173,6 +190,8 @@ class SettingsStore:
             "per_domain_concurrency": self.per_domain_concurrency,
             "request_timeout": self.request_timeout,
             "chapter_retry_limit": self.chapter_retry_limit,
+            "follow_enabled": self.follow_enabled,
+            "follow_interval_hours": self.follow_interval_hours,
             "cookies": self.cookies,
             "api_keys": self.api_key_hints(),
         }
@@ -187,6 +206,8 @@ class SettingsStore:
             PER_DOMAIN_CONCURRENCY,
             REQUEST_TIMEOUT,
             CHAPTER_RETRY_LIMIT,
+            FOLLOW_ENABLED,
+            FOLLOW_INTERVAL_HOURS,
         ):
             if key in changes:
                 self.repo.set(key, changes[key])

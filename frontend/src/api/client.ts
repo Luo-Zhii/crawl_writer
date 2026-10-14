@@ -8,6 +8,8 @@ import type {
   ChapterStatus,
   ChapterSummary,
   ExportFormat,
+  FollowCheckResult,
+  FollowStatus,
   GlossaryTerm,
   Job,
   JobStatus,
@@ -159,6 +161,15 @@ export const deleteCookie = (domain: string) =>
   api.delete<AppSettings>(`/settings/cookies/${encodeURIComponent(domain)}`);
 
 export const checkBrowser = () => api.post<BrowserCheck>("/settings/browser-check");
+
+// --- follow / auto update --------------------------------------------------
+
+export const getFollowStatus = () => api.get<FollowStatus>("/follow/status");
+
+export const checkFollowNow = () => api.post<FollowCheckResult>("/follow/check-now");
+
+/** Clear the "new chapters" badge once the user has looked at the novel. */
+export const markNovelSeen = (novelId: number) => api.post<void>(`/follow/${novelId}/seen`);
 
 // --- translation -----------------------------------------------------------
 

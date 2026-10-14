@@ -196,3 +196,38 @@ def test_update_accepts_keys_from_the_settings_page(session: Session):
 
     assert store.api_key("gemini") == "new-key"
     assert store.api_key("bogus") is None, "unknown providers must be ignored"
+
+
+# --- follow settings -------------------------------------------------------
+
+
+def test_following_is_on_by_default(session: Session):
+    store = SettingsStore(session)
+
+    assert store.follow_enabled is True
+    assert store.follow_interval_hours == 6
+
+
+def test_follow_settings_round_trip(session: Session):
+    store = SettingsStore(session)
+
+    store.update({"follow_enabled": False, "follow_interval_hours": 12})
+
+    assert store.follow_enabled is False
+    assert store.follow_interval_hours == 12
+
+
+def test_a_nonsense_interval_is_clamped_to_an_hour(session: Session):
+    """A zero interval would make the scheduler fire in a tight loop."""
+    store = SettingsStore(session)
+
+    store.update({"follow_interval_hours": 0})
+
+    assert store.follow_interval_hours == 1
+
+
+def test_follow_settings_appear_in_the_dict_view(session: Session):
+    body = SettingsStore(session).as_dict()
+
+    assert body["follow_enabled"] is True
+    assert body["follow_interval_hours"] == 6

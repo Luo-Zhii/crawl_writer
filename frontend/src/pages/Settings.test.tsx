@@ -12,8 +12,19 @@ const SETTINGS = {
   per_domain_concurrency: 4,
   request_timeout: 30,
   chapter_retry_limit: 3,
+  follow_enabled: true,
+  follow_interval_hours: 6,
   cookies: {},
   api_keys: { gemini: null, openai: null, anthropic: null },
+};
+
+const FOLLOW_STATUS = {
+  enabled: true,
+  interval_hours: 6,
+  running: true,
+  next_run_at: "2026-10-14T18:00:00Z",
+  followed_count: 3,
+  new_chapters: 5,
 };
 
 function parseBody(init?: RequestInit) {
@@ -186,5 +197,90 @@ describe("Settings", () => {
     await userEvent.click(screen.getByRole("button", { name: "Lưu cài đặt" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("delay too small");
+  });
+});
+
+describe("Settings auto update", () => {
+  it("shows the current interval and what the scheduler is doing", async () => {
+    stubFetch({ "/api/follow/status": FOLLOW_STATUS, "/api/settings": SETTINGS });
+
+    renderPage(<Settings />);
+
+    expect(await screen.findByLabelText("Chu kỳ kiểm tra")).toHaveValue("6");
+    expect(await screen.findByText(/Đang theo dõi 3 truyện/)).toBeInTheDocument();
+    expect(screen.getByText(/5 chương mới chưa xem/)).toBeInTheDocument();
+  });
+
+  it("says so when the timer is off", async () => {
+    stubFetch({
+      "/api/follow/status": { ...FOLLOW_STATUS, running: false, next_run_at: null },
+      "/api/settings": { ...SETTINGS, follow_enabled: false },
+    });
+
+    renderPage(<Settings />);
+
+    expect(await screen.findByText(/bộ hẹn giờ đang tắt/)).toBeInTheDocument();
+  });
+
+  it("saves a new interval as soon as it is picked", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    stubFetch({
+      "/api/follow/status": FOLLOW_STATUS,
+      "/api/settings": (_url: string, init?: RequestInit) => {
+        if (init?.method === "PUT") bodies.push(parseBody(init));
+        return SETTINGS;
+      },
+    });
+
+    renderPage(<Settings />);
+    await userEvent.selectOptions(await screen.findByLabelText("Chu kỳ kiểm tra"), "24");
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toEqual({ follow_interval_hours: 24 });
+  });
+
+  it("toggles auto update off", async () => {
+    const bodies: Record<string, unknown>[] = [];
+    stubFetch({
+      "/api/follow/status": FOLLOW_STATUS,
+      "/api/settings": (_url: string, init?: RequestInit) => {
+        if (init?.method === "PUT") bodies.push(parseBody(init));
+        return SETTINGS;
+      },
+    });
+
+    renderPage(<Settings />);
+    await userEvent.click(
+      await screen.findByLabelText("Tự động kiểm tra chương mới"),
+    );
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toEqual({ follow_enabled: false });
+  });
+
+  it("reports how many jobs a manual check queued", async () => {
+    stubFetch({
+      "/api/follow/check-now": { job_ids: [11, 12], considered: 3 },
+      "/api/follow/status": FOLLOW_STATUS,
+      "/api/settings": SETTINGS,
+    });
+
+    renderPage(<Settings />);
+    await userEvent.click(await screen.findByRole("button", { name: "Kiểm tra ngay" }));
+
+    expect(await screen.findByText(/Đã tạo 2 tiến trình cập nhật/)).toBeInTheDocument();
+  });
+
+  it("says nothing was due rather than looking like it failed", async () => {
+    stubFetch({
+      "/api/follow/check-now": { job_ids: [], considered: 4 },
+      "/api/follow/status": FOLLOW_STATUS,
+      "/api/settings": SETTINGS,
+    });
+
+    renderPage(<Settings />);
+    await userEvent.click(await screen.findByRole("button", { name: "Kiểm tra ngay" }));
+
+    expect(await screen.findByText(/Đã xem 4 truyện/)).toBeInTheDocument();
   });
 });

@@ -13,6 +13,7 @@ from app.core.logging import get_logger, setup_logging
 from app.core.settings import get_settings
 from app.db.session import upgrade_to_head
 from app.pipeline.manager import JobManager
+from app.scheduler import FollowScheduler
 
 log = get_logger(__name__)
 
@@ -33,9 +34,16 @@ async def lifespan(app: FastAPI):
     app.state.job_manager = manager
     await manager.start()
 
+    # Started after the worker, because a due check enqueues jobs the worker
+    # has to be there to pick up.
+    follow = FollowScheduler(manager)
+    app.state.follow_scheduler = follow
+    follow.start()
+
     try:
         yield
     finally:
+        follow.shutdown()
         await manager.stop()
         log.info("crawl_writer shutting down")
 
