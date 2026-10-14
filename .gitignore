@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+*.tsbuildinfo
+
+# App data (crawled novels, db, exports).
+# Ignore the contents, keep the directory itself in the tree.
+data/*
+!data/.gitkeep
+
+# Secrets / local config
+.env
+.env.*
+!.env.example
+backend/app/config.local.toml
+
+# Playwright
+playwright-report/
+test-results/
+.playwright/
+
+# Editors / OS
+.DS_Store
+*.swp
+.idea/
+.vscode/*
+!.vscode/extensions.json
