@@ -6,7 +6,12 @@ by the time anything calls :func:`app.sources.registry.resolve`.
 
 # Adapters must be imported for their @register decorator to run; the imports
 # are kept below the shared definitions they depend on.
-from app.sources import truyendich, truyenhoan  # noqa: F401  (side effect: registration)
+from app.sources import (  # noqa: F401  (side effect: registration)
+    czbooks,
+    truyendich,
+    truyenhoan,
+    uukanshu,
+)
 from app.sources.base import (
     ChapterLocked,
     ChapterRef,

@@ -65,7 +65,8 @@ make lint   # ruff + tsc
 - [x] Xuất TXT / JSON / EPUB
 - [x] UI quản lý crawl và thư viện
 - [x] Playwright cho site Cloudflare (xem phần giới hạn bên dưới)
-- [ ] Adapter site Trung + dịch sang Việt
+- [x] Adapter site Trung (đang có: uukanshu, czbooks)
+- [ ] Dịch raw Trung sang Việt
 - [ ] Trình đọc trong web
 - [ ] Theo dõi và tự cập nhật chương mới
 
@@ -288,3 +289,37 @@ restart:
 - **Cookie theo từng site**.
 - **API key** cho engine dịch bằng LLM. Key chỉ được lưu ở máy bạn và không bao
   giờ trả về qua API — trang cài đặt chỉ hiện 4 ký tự cuối để phân biệt.
+
+## Tình hình các site truyện Trung
+
+Khảo sát trực tiếp 20 domain:
+
+| Site | Tình trạng |
+| --- | --- |
+| uukanshu.cc (UU看書) | **chạy được**, đã có adapter, phồn thể |
+| czbooks.net (小說狂人) | **chạy được**, đã có adapter, phồn thể |
+| 69shuba.com, 81zw.com, twkan.com | Cloudflare chặn (trang "Just a moment...") |
+| ptwxz.com (飄天文學) | có trang chống bot, nội dung GB18030 |
+| 3bqg.cc (笔趣阁) | redirect sang 33bqg.com rồi đẩy vào `/user/verify.html` |
+| xbanxia.cc, shu05.com, ciweimao.com | sống, chưa khảo sát cấu trúc |
+| biquge.com, biqugee.com, xbiquge.la, uukanshu.net, b5200.net, 23us.com, trxs.cc, dxmwx.org, bxwxorg.com | không kết nối được |
+
+Site Trung khác site Việt ở hai điểm, và đó là lý do có `app/sources/zh_base.py`
+riêng:
+
+- **URL chương là ID database** (`/book/27265/17948862.html`), không chứa số
+  chương. Nên số chương được lấy từ tiêu đề (`第12章`, kể cả số viết bằng chữ
+  như `第十二章` hay `第一百零八回`). Chương không có số trong tiêu đề (`新書感言`)
+  được xếp vào khe trống ngay trước chương kế tiếp, nên lời mở đầu thành chương
+  0 đúng như cách site tự đánh số.
+- **Danh sách chương nằm trên một trang**, không phân trang, và chương mới nhất
+  thường được nhắc lại ở đầu trang nên phải loại trùng.
+
+Chữ phồn thể và giản thể được xử lý trong `app/sources/zh_text.py`
+(`to_simplified`, `to_traditional`, `looks_traditional`). Cùng một truyện hay
+được đăng ở cả hai dạng, mà glossary tên riêng xây từ dạng này sẽ không khớp
+dạng kia, nên bước dịch sẽ chuẩn hoá về một dạng trước.
+
+Encoding: nhiều site Trung khai GBK/GB2312 chỉ trong thẻ `<meta>` chứ không
+trong HTTP header, nên `app/fetch/decode.py` ưu tiên meta hơn header và nới
+gb2312/gbk thành gb18030.
