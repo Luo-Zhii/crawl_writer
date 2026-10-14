@@ -7,7 +7,9 @@ help:
 	@echo "setup    - create venv, install backend + frontend deps"
 	@echo "dev-api  - run FastAPI on :8000 (reload)"
 	@echo "dev-web  - run Vite dev server on :5173"
-	@echo "test     - run backend tests"
+	@echo "test     - run backend + frontend tests"
+	@echo "test-api - run backend tests only"
+	@echo "test-web - run frontend tests only"
 	@echo "lint     - ruff check + tsc typecheck"
 	@echo "fmt      - ruff format"
 	@echo "build    - build frontend"
@@ -26,6 +28,13 @@ dev-web:
 
 test:
 	cd backend && ../$(PY) -m pytest -q
+	cd frontend && npm test
+
+test-api:
+	cd backend && ../$(PY) -m pytest -q
+
+test-web:
+	cd frontend && npm test
 
 lint:
 	.venv/bin/ruff check backend

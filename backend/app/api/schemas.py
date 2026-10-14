@@ -134,3 +134,28 @@ class SourceInfo(BaseModel):
     domains: list[str]
     lang: Lang
     needs_browser: bool
+
+
+class PreviewRequest(BaseModel):
+    url: str
+
+
+class PreviewResponse(BaseModel):
+    """What a pasted URL turns out to be, before anything is saved.
+
+    Deliberately does not include the chapter list: that can mean fetching
+    several pages, which is too slow for a preview.
+    """
+
+    source: str
+    source_name: str
+    url: str
+    title: str
+    author: str | None = None
+    cover_url: str | None = None
+    description: str | None = None
+    genres: list[str] = []
+    status: NovelStatus
+    lang: Lang
+    #: Set when this novel is already in the library.
+    novel_id: int | None = None

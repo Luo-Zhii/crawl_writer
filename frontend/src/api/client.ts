@@ -1,6 +1,19 @@
 // Thin fetch wrapper. Everything the UI does goes through the REST API so a
 // mobile client can reuse the exact same endpoints later.
 
+import type {
+  ChapterStatus,
+  ChapterSummary,
+  ExportFormat,
+  Job,
+  JobStatus,
+  NovelDetail,
+  NovelSummary,
+  Paged,
+  Preview,
+  SourceInfo,
+} from "./types";
+
 const BASE = "/api";
 
 export class ApiError extends Error {
@@ -23,7 +36,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     let detail = resp.statusText;
     try {
       const body = await resp.json();
-      if (body?.detail) detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+      if (body?.detail) {
+        detail = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+      }
     } catch {
       // response had no JSON body; keep statusText
     }
@@ -37,9 +52,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>
-    request<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) }),
+    request<T>(path, {
+      method: "POST",
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
   patch: <T>(path: string, body?: unknown) =>
-    request<T>(path, { method: "PATCH", body: body === undefined ? undefined : JSON.stringify(body) }),
+    request<T>(path, {
+      method: "PATCH",
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };
 
@@ -49,3 +70,75 @@ export interface Health {
 }
 
 export const getHealth = () => api.get<Health>("/health");
+
+// --- library ---------------------------------------------------------------
+
+export const listNovels = (params: { limit?: number; offset?: number; followed?: boolean } = {}) => {
+  const query = new URLSearchParams();
+  if (params.limit !== undefined) query.set("limit", String(params.limit));
+  if (params.offset !== undefined) query.set("offset", String(params.offset));
+  if (params.followed !== undefined) query.set("followed", String(params.followed));
+  const suffix = query.toString();
+  return api.get<Paged<NovelSummary>>(`/novels${suffix ? `?${suffix}` : ""}`);
+};
+
+export const getNovel = (id: number) => api.get<NovelDetail>(`/novels/${id}`);
+
+export const updateNovel = (
+  id: number,
+  changes: Partial<Pick<NovelDetail, "title" | "author" | "followed" | "translate_enabled">>,
+) => api.patch<NovelDetail>(`/novels/${id}`, changes);
+
+export const deleteNovel = (id: number) => api.delete<void>(`/novels/${id}`);
+
+export const listChapters = (
+  id: number,
+  params: { limit?: number; offset?: number; status?: ChapterStatus } = {},
+) => {
+  const query = new URLSearchParams();
+  if (params.limit !== undefined) query.set("limit", String(params.limit));
+  if (params.offset !== undefined) query.set("offset", String(params.offset));
+  if (params.status) query.set("status", params.status);
+  const suffix = query.toString();
+  return api.get<Paged<ChapterSummary>>(`/novels/${id}/chapters${suffix ? `?${suffix}` : ""}`);
+};
+
+/** Download URL for an export. Used as a plain link so the browser saves it. */
+export const exportUrl = (
+  id: number,
+  format: ExportFormat,
+  options: { translated?: boolean; volumeSize?: number } = {},
+) => {
+  const query = new URLSearchParams({ format });
+  if (options.translated) query.set("translated", "true");
+  if (options.volumeSize) query.set("volume_size", String(options.volumeSize));
+  return `${BASE}/novels/${id}/export?${query.toString()}`;
+};
+
+// --- sources and preview ---------------------------------------------------
+
+export const listSources = () => api.get<SourceInfo[]>("/sources");
+
+export const previewUrl = (url: string) => api.post<Preview>("/preview", { url });
+
+// --- jobs ------------------------------------------------------------------
+
+export const listJobs = (params: { limit?: number; status?: JobStatus } = {}) => {
+  const query = new URLSearchParams();
+  if (params.limit !== undefined) query.set("limit", String(params.limit));
+  if (params.status) query.set("status", params.status);
+  const suffix = query.toString();
+  return api.get<Paged<Job>>(`/jobs${suffix ? `?${suffix}` : ""}`);
+};
+
+export const getJob = (id: number) => api.get<Job>(`/jobs/${id}`);
+
+export const startCrawl = (url: string) => api.post<Job>("/jobs", { url });
+
+export const startUpdate = (novelId: number) => api.post<Job>(`/novels/${novelId}/update`);
+
+export const pauseJob = (id: number) => api.post<Job>(`/jobs/${id}/pause`);
+export const resumeJob = (id: number) => api.post<Job>(`/jobs/${id}/resume`);
+export const cancelJob = (id: number) => api.post<Job>(`/jobs/${id}/cancel`);
+
+export const jobEventsUrl = (id: number) => `${BASE}/jobs/${id}/events`;

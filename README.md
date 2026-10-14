@@ -51,7 +51,7 @@ data/
 ## Kiểm tra
 
 ```bash
-make test   # pytest
+make test   # pytest + vitest
 make lint   # ruff + tsc
 ```
 
@@ -63,7 +63,7 @@ make lint   # ruff + tsc
 - [x] Source adapter cho từng site (đang có: truyenhoan)
 - [x] Crawl pipeline có resume
 - [x] Xuất TXT / JSON / EPUB
-- [ ] UI quản lý crawl và thư viện
+- [x] UI quản lý crawl và thư viện
 - [ ] Playwright cho site Cloudflare
 - [ ] Adapter site Trung + dịch sang Việt
 - [ ] Trình đọc trong web

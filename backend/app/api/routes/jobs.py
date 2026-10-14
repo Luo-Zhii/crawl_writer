@@ -10,12 +10,20 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlmodel import Session
 from sse_starlette.sse import EventSourceResponse
 
-from app.api.schemas import JobCreate, JobListResponse, JobRead, SourceInfo
+from app.api.schemas import (
+    JobCreate,
+    JobListResponse,
+    JobRead,
+    PreviewRequest,
+    PreviewResponse,
+    SourceInfo,
+)
 from app.db.models import JobStatus, JobType
 from app.db.repository import JobRepository, NovelRepository
 from app.db.session import get_session, session_scope
+from app.fetch import Blocked, FetchError, HttpFetcher
 from app.pipeline.manager import JobManager
-from app.sources import all_sources, find_for_url
+from app.sources import SourceError, all_sources, find_for_url
 
 router = APIRouter(tags=["jobs"])
 
@@ -45,6 +53,62 @@ def list_sources() -> list[SourceInfo]:
         )
         for cls in sorted(all_sources(), key=lambda c: c.key)
     ]
+
+
+@router.post("/preview", response_model=PreviewResponse, tags=["meta"])
+async def preview_url(
+    payload: PreviewRequest,
+    session: Session = Depends(get_session),
+) -> PreviewResponse:
+    """Look up a pasted URL without saving anything.
+
+    Lets the user confirm they got the right novel before starting a crawl
+    that could run for several minutes.
+    """
+    source_cls = find_for_url(payload.url)
+    if source_cls is None:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            f"No adapter handles this URL: {payload.url}",
+        )
+
+    fetcher = HttpFetcher()
+    try:
+        source = source_cls(fetcher)
+        url = payload.url
+        if getattr(source, "is_chapter_url", None) and source.is_chapter_url(url):
+            url = await source.novel_url_from_chapter(url)
+        info = await source.novel_info(source.canonical_url(url))
+    except Blocked as exc:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            f"Site refused the request: {exc.reason}. "
+            "This source needs a browser, a proxy or cookies.",
+        ) from exc
+    except SourceError as exc:
+        raise HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            f"Could not read that page: {exc}. The site layout may have changed.",
+        ) from exc
+    except FetchError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from exc
+    finally:
+        await fetcher.aclose()
+
+    existing = NovelRepository(session).get_by_source_url(source_cls.key, info.url)
+    return PreviewResponse(
+        source=source_cls.key,
+        source_name=source_cls.name,
+        url=info.url,
+        title=info.title,
+        author=info.author,
+        cover_url=info.cover_url,
+        description=info.description,
+        genres=info.genres,
+        status=info.status,
+        lang=info.lang,
+        novel_id=existing.id if existing else None,
+    )
 
 
 @router.post("/jobs", response_model=JobRead, status_code=status.HTTP_202_ACCEPTED)

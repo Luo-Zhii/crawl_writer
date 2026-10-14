@@ -1,31 +1,22 @@
-import { useQuery } from "@tanstack/react-query";
+import { Route, Routes } from "react-router-dom";
 
-import { getHealth } from "./api/client";
+import Layout from "./components/Layout";
+import AddNovel from "./pages/AddNovel";
+import Jobs from "./pages/Jobs";
+import Library from "./pages/Library";
+import NotFound from "./pages/NotFound";
+import NovelDetail from "./pages/NovelDetail";
 
 export default function App() {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["health"],
-    queryFn: getHealth,
-  });
-
   return (
-    <main style={{ maxWidth: 720, margin: "4rem auto", padding: "0 1rem" }}>
-      <h1>crawl_writer</h1>
-      <p style={{ color: "var(--text-soft)" }}>
-        Tool crawl truyện chữ về máy để đọc offline.
-      </p>
-
-      {isLoading && <p>Đang kiểm tra backend…</p>}
-      {error && (
-        <p style={{ color: "var(--err)" }}>
-          Không gọi được backend. Chạy <code>make dev-api</code> rồi thử lại.
-        </p>
-      )}
-      {data && (
-        <p style={{ color: "var(--ok)" }}>
-          API OK — version {data.version}
-        </p>
-      )}
-    </main>
+    <Routes>
+      <Route element={<Layout />}>
+        <Route path="/" element={<Library />} />
+        <Route path="/add" element={<AddNovel />} />
+        <Route path="/jobs" element={<Jobs />} />
+        <Route path="/novels/:id" element={<NovelDetail />} />
+        <Route path="*" element={<NotFound />} />
+      </Route>
+    </Routes>
   );
 }
