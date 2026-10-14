@@ -59,7 +59,7 @@ make lint   # ruff + tsc
 
 - [x] Scaffold backend + frontend
 - [x] DB và storage layer
-- [ ] Fetcher (retry, rate limit, phát hiện bị chặn)
+- [x] Fetcher (retry, rate limit, phát hiện bị chặn)
 - [ ] Source adapter cho từng site
 - [ ] Crawl pipeline có resume
 - [ ] Xuất TXT / JSON / EPUB
