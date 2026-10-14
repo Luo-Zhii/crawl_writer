@@ -23,6 +23,7 @@ export interface NovelSummary {
   status: NovelStatus;
   translate_enabled: boolean;
   followed: boolean;
+  last_read_chapter: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -124,6 +125,18 @@ export interface GlossaryTerm {
   source: string;
   target: string;
   note: string | null;
+}
+
+export interface ChapterRead {
+  number: number;
+  title: string;
+  text: string;
+  translated: boolean;
+  has_translation: boolean;
+  prev_number: number | null;
+  next_number: number | null;
+  novel_id: number;
+  novel_title: string;
 }
 
 /** One frame from the job event stream. */

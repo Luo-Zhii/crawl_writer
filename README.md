@@ -67,7 +67,7 @@ make lint   # ruff + tsc
 - [x] Playwright cho site Cloudflare (xem phần giới hạn bên dưới)
 - [x] Adapter site Trung (đang có: uukanshu, czbooks)
 - [x] Dịch raw Trung sang Việt + glossary (xem phần giới hạn bên dưới)
-- [ ] Trình đọc trong web
+- [x] Trình đọc trong web
 - [ ] Theo dõi và tự cập nhật chương mới
 
 ## Lưu ý pháp lý
@@ -391,3 +391,41 @@ Muốn dịch được thật thì chọn một trong hai:
 
 - Nhập API key LLM ở trang Cài đặt (Gemini rẻ nhất trong ba cái).
 - Dùng proxy ở trang Cài đặt để đổi IP ra khỏi dải đang bị Google chặn.
+
+## Đọc truyện trên web
+
+Bấm tên chương trong danh sách, hoặc nút **Đọc tiếp** ở thư viện và trang chi
+tiết. Đường dẫn dạng `/novels/<id>/doc/<số chương>`.
+
+- **Vị trí đọc lưu ở server**, không phải trong trình duyệt. Mở lại trên máy
+  khác hay trên điện thoại sau này vẫn đúng chỗ đang đọc.
+- **Cỡ chữ và bề rộng cột** lưu ở máy, vì đó là chuyện của màn hình trước mắt
+  bạn chứ không phải của truyện.
+- **Nền tối** dùng chung với toàn app, bấm ở góc trên bên phải.
+- **Mũi tên ← →** để chuyển chương, hoặc nút ở cuối trang. Chương đầu và chương
+  cuối thì nút bị khoá.
+- Truyện Trung đã dịch có nút **Xem bản dịch / Xem nguyên văn**.
+- Chương trước và chương sau lấy từ danh sách chương thật chứ không phải
+  `số ± 1`, vì gần như site nào cũng có lỗ hổng trong cách đánh số.
+
+API tương ứng, dùng được cho app mobile sau này:
+
+```bash
+curl "http://127.0.0.1:8000/api/novels/1/chapters/3"
+curl "http://127.0.0.1:8000/api/novels/1/chapters/3?translated=true"
+curl -X PUT "http://127.0.0.1:8000/api/novels/1/progress" \
+  -H 'Content-Type: application/json' -d '{"chapter":3}'
+```
+
+Chương chưa tải trả về 409 kèm lý do, không phải trang trắng.
+
+## Nâng cấp schema
+
+Server **tự chạy migration khi khởi động**, nên nâng cấp code rồi chạy lại là
+xong, không cần gõ lệnh alembic.
+
+Lý do làm vậy: trước đây app chỉ gọi `create_all`, mà lệnh đó chỉ tạo bảng còn
+thiếu chứ không bao giờ thêm cột vào bảng đã có. Khi thêm cột mới, database cũ
+bị bỏ lại phía sau và mọi truy vấn chạm tới cột đó đều lỗi
+(`no such column: novel.last_read_chapter`). Đây là app chạy local một người
+dùng nên tự migrate là an toàn.

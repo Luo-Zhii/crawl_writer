@@ -4,6 +4,7 @@
 import type {
   AppSettings,
   BrowserCheck,
+  ChapterRead,
   ChapterStatus,
   ChapterSummary,
   ExportFormat,
@@ -174,3 +175,16 @@ export const deleteGlossaryTerm = (novelId: number, termId: number) =>
 
 export const startTranslation = (novelId: number, force = false) =>
   api.post<Job>(`/novels/${novelId}/translate`, { force });
+
+// --- reader ----------------------------------------------------------------
+
+export const readChapter = (novelId: number, number: number, translated = false) =>
+  api.get<ChapterRead>(
+    `/novels/${novelId}/chapters/${number}${translated ? "?translated=true" : ""}`,
+  );
+
+export const saveProgress = (novelId: number, chapter: number) =>
+  request<NovelDetail>(`/novels/${novelId}/progress`, {
+    method: "PUT",
+    body: JSON.stringify({ chapter }),
+  });

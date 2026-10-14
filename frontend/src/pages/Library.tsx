@@ -107,6 +107,12 @@ function NovelRow({
       </div>
 
       <div className="novel-actions">
+        <Link
+          className="button-link"
+          to={`/novels/${novel.id}/doc/${novel.last_read_chapter ?? 1}`}
+        >
+          {novel.last_read_chapter ? "Đọc tiếp" : "Đọc"}
+        </Link>
         <button type="button" onClick={onUpdate} disabled={busy}>
           Tải chương mới
         </button>

@@ -42,8 +42,29 @@ class NovelSummary(BaseModel):
     status: NovelStatus
     translate_enabled: bool
     followed: bool
+    last_read_chapter: int | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class ChapterRead(BaseModel):
+    """A chapter with its text, for the reader."""
+
+    number: int
+    title: str
+    text: str
+    #: True when the text returned is the translation rather than the original.
+    translated: bool
+    has_translation: bool
+    #: Neighbours that actually exist, so the reader can disable the buttons.
+    prev_number: int | None = None
+    next_number: int | None = None
+    novel_id: int
+    novel_title: str
+
+
+class ReadingProgress(BaseModel):
+    chapter: int
 
 
 class NovelDetail(NovelSummary):

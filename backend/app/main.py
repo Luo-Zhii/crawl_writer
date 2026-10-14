@@ -11,7 +11,7 @@ from app import __version__
 from app.api.router import api_router
 from app.core.logging import get_logger, setup_logging
 from app.core.settings import get_settings
-from app.db.session import create_db_and_tables
+from app.db.session import upgrade_to_head
 from app.pipeline.manager import JobManager
 
 log = get_logger(__name__)
@@ -22,7 +22,9 @@ async def lifespan(app: FastAPI):
     setup_logging()
     settings = get_settings()
     settings.ensure_dirs()
-    create_db_and_tables()
+    # Migrations rather than create_all: the latter cannot add a column to an
+    # existing table, which would leave the schema behind and break queries.
+    upgrade_to_head()
     log.info("crawl_writer %s starting, data dir: %s", __version__, settings.data_dir)
 
     # The worker lives for the life of the process. Starting it here also

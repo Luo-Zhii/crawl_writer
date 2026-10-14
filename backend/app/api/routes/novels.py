@@ -8,13 +8,15 @@ from sqlmodel import Session
 
 from app.api.schemas import (
     ChapterListResponse,
+    ChapterRead,
     ChapterSummary,
     NovelDetail,
     NovelListResponse,
     NovelSummary,
     NovelUpdate,
+    ReadingProgress,
 )
-from app.db.models import ChapterStatus
+from app.db.models import ChapterStatus, utcnow
 from app.db.repository import ChapterRepository, NovelRepository
 from app.db.session import get_session
 from app.db.storage import ChapterStorage, get_storage
@@ -99,6 +101,80 @@ def delete_novel(
     # missing text is not.
     repo.delete(novel)
     storage.delete_novel(novel_id)
+
+
+@router.get("/{novel_id}/chapters/{number}", response_model=ChapterRead)
+def read_chapter(
+    novel_id: int,
+    number: int,
+    translated: bool = Query(False, description="Return the translation when there is one"),
+    session: Session = Depends(get_session),
+    storage: ChapterStorage = Depends(get_storage),
+) -> ChapterRead:
+    """One chapter with its text, for the in-browser reader."""
+    novel = NovelRepository(session).get(novel_id)
+    if novel is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Novel not found")
+
+    repo = ChapterRepository(session)
+    chapter = repo.get_by_number(novel_id, number)
+    if chapter is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Chapter not found")
+
+    want_translation = translated and chapter.has_translation
+    text = storage.read(novel_id, number, translated=want_translation)
+    if text is None and want_translation:
+        # Asked for the translation but the file is gone: fall back rather
+        # than showing an empty reader.
+        want_translation = False
+        text = storage.read(novel_id, number)
+    if text is None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "This chapter has not been downloaded yet",
+        )
+
+    # Neighbours come from the database, not number±1, because chapter
+    # numbering has gaps on most sites.
+    numbers = [row.number for row in repo.list_for_novel(novel_id)]
+    position = numbers.index(number)
+
+    return ChapterRead(
+        number=number,
+        title=chapter.title,
+        text=text,
+        translated=want_translation,
+        has_translation=chapter.has_translation,
+        prev_number=numbers[position - 1] if position > 0 else None,
+        next_number=numbers[position + 1] if position + 1 < len(numbers) else None,
+        novel_id=novel_id,
+        novel_title=novel.title,
+    )
+
+
+@router.put("/{novel_id}/progress", response_model=NovelDetail)
+def save_progress(
+    novel_id: int,
+    payload: ReadingProgress,
+    session: Session = Depends(get_session),
+    storage: ChapterStorage = Depends(get_storage),
+) -> NovelDetail:
+    """Remember where the reader got to.
+
+    Stored server-side so the position follows the user between devices,
+    which is also what a future mobile app will read.
+    """
+    repo = NovelRepository(session)
+    novel = repo.get(novel_id)
+    if novel is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Novel not found")
+    if ChapterRepository(session).get_by_number(novel_id, payload.chapter) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Chapter not found")
+
+    novel = repo.update(
+        novel, last_read_chapter=payload.chapter, last_read_at=utcnow()
+    )
+    return _detail(novel, ChapterRepository(session), storage)
 
 
 @router.get("/{novel_id}/export")

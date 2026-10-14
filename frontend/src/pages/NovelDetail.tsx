@@ -141,6 +141,16 @@ export default function NovelDetail() {
           {data.description && <p className="preview-desc">{data.description}</p>}
 
           <div className="detail-actions">
+            {data.chapters_done > 0 && (
+              <Link
+                className="button-link primary-link"
+                to={`/novels/${novelId}/doc/${data.last_read_chapter ?? 1}`}
+              >
+                {data.last_read_chapter
+                  ? `Đọc tiếp chương ${data.last_read_chapter}`
+                  : "Đọc từ đầu"}
+              </Link>
+            )}
             <button type="button" onClick={() => update.mutate()} disabled={update.isPending}>
               Tải chương mới
             </button>
@@ -292,7 +302,15 @@ export default function NovelDetail() {
             {chapters.data.items.map((chapter) => (
               <tr key={chapter.id}>
                 <td className="num">{chapter.number}</td>
-                <td>{chapter.title}</td>
+                <td>
+                  {chapter.status === "done" ? (
+                    <Link to={`/novels/${novelId}/doc/${chapter.number}`}>
+                      {chapter.title}
+                    </Link>
+                  ) : (
+                    chapter.title
+                  )}
+                </td>
                 <td>
                   <ChapterStatusBadge status={chapter.status} />
                 </td>

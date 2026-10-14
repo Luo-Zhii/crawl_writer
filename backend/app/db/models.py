@@ -83,6 +83,11 @@ class Novel(SQLModel, table=True):
     followed: bool = Field(default=False)
     last_checked_at: datetime | None = None
 
+    # Reading position, kept server-side rather than in the browser so a
+    # phone and a laptop pick up where the other left off.
+    last_read_chapter: int | None = None
+    last_read_at: datetime | None = None
+
     created_at: datetime = Field(default_factory=utcnow)
     updated_at: datetime = Field(default_factory=utcnow)
 
