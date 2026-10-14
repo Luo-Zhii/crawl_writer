@@ -26,6 +26,7 @@ log = get_logger(__name__)
 
 PROXY = "proxy"
 BROWSER_ENABLED = "browser_enabled"
+TRANSLATE_PROVIDER = "translate_provider"
 PER_DOMAIN_DELAY = "per_domain_delay"
 PER_DOMAIN_CONCURRENCY = "per_domain_concurrency"
 REQUEST_TIMEOUT = "request_timeout"
@@ -72,6 +73,11 @@ class SettingsStore:
     @property
     def chapter_retry_limit(self) -> int:
         return int(self.repo.get(CHAPTER_RETRY_LIMIT, self.base.chapter_retry_limit))
+
+    @property
+    def translate_provider(self) -> str:
+        """Which engine to try first. Google needs no key, so it is the default."""
+        return str(self.repo.get(TRANSLATE_PROVIDER, "google"))
 
     # --- cookies -----------------------------------------------------------
 
@@ -162,6 +168,7 @@ class SettingsStore:
         return {
             "proxy": self.proxy,
             "browser_enabled": self.browser_enabled,
+            "translate_provider": self.translate_provider,
             "per_domain_delay": self.per_domain_delay,
             "per_domain_concurrency": self.per_domain_concurrency,
             "request_timeout": self.request_timeout,
@@ -175,6 +182,7 @@ class SettingsStore:
         for key in (
             PROXY,
             BROWSER_ENABLED,
+            TRANSLATE_PROVIDER,
             PER_DOMAIN_DELAY,
             PER_DOMAIN_CONCURRENCY,
             REQUEST_TIMEOUT,

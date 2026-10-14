@@ -7,9 +7,11 @@ import {
   exportUrl,
   getNovel,
   listChapters,
+  startTranslation,
   startUpdate,
   updateNovel,
 } from "../api/client";
+import GlossaryPanel from "../components/GlossaryPanel";
 import type { ChapterStatus, ExportFormat } from "../api/types";
 import {
   Badge,
@@ -63,6 +65,11 @@ export default function NovelDetail() {
 
   const update = useMutation({
     mutationFn: () => startUpdate(novelId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["jobs"] }),
+  });
+
+  const translate = useMutation({
+    mutationFn: (force: boolean) => startTranslation(novelId, force),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["jobs"] }),
   });
 
@@ -158,6 +165,27 @@ export default function NovelDetail() {
             </button>
           </div>
 
+          {data.lang === "zh" && (
+            <div className="detail-actions">
+              <button
+                type="button"
+                className="primary"
+                onClick={() => translate.mutate(false)}
+                disabled={translate.isPending}
+              >
+                Dịch sang tiếng Việt
+              </button>
+              <button
+                type="button"
+                onClick={() => translate.mutate(true)}
+                disabled={translate.isPending}
+                title="Dịch lại cả những chương đã có bản dịch"
+              >
+                Dịch lại toàn bộ
+              </button>
+            </div>
+          )}
+
           <div className="detail-actions">
             {(["epub", "txt", "json"] as ExportFormat[]).map((format) => (
               <a
@@ -177,17 +205,35 @@ export default function NovelDetail() {
             >
               EPUB chia phần
             </a>
+            {data.lang === "zh" && (
+              <a
+                className="button-link"
+                href={exportUrl(novelId, "epub", { translated: true })}
+                download
+                title="Chương nào chưa dịch sẽ lấy bản gốc"
+              >
+                EPUB bản dịch
+              </a>
+            )}
           </div>
 
-          {update.isSuccess && (
+          {(update.isSuccess || translate.isSuccess) && (
             <p className="muted small">
               Đã tạo tiến trình. Xem ở <Link to="/jobs">Tiến trình</Link>.
             </p>
           )}
           {update.error && <ErrorBox error={update.error} />}
+          {translate.error && <ErrorBox error={translate.error} />}
           {remove.error && <ErrorBox error={remove.error} />}
         </div>
       </article>
+
+      {data.lang === "zh" && (
+        <>
+          <h2 className="section-title">Glossary tên riêng</h2>
+          <GlossaryPanel novelId={novelId} />
+        </>
+      )}
 
       <h2 className="section-title">Danh sách chương</h2>
 

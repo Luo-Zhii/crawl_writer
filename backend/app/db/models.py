@@ -147,6 +147,51 @@ class Job(SQLModel, table=True):
     finished_at: datetime | None = None
 
 
+class GlossaryTerm(SQLModel, table=True):
+    """A name the translator must always render the same way.
+
+    Machine translation is inconsistent with proper nouns: the same character
+    can come out three different ways across a long novel, which is the main
+    thing that makes a translated book unreadable. A glossary pins them.
+    """
+
+    __tablename__ = "glossary_term"
+    __table_args__ = (
+        UniqueConstraint("novel_id", "source", name="uq_glossary_novel_source"),
+    )
+
+    id: int | None = Field(default=None, primary_key=True)
+    novel_id: int = Field(foreign_key="novel.id", index=True, ondelete="CASCADE")
+
+    #: Term as it appears in the original text.
+    source: str
+    #: What it should read as after translation.
+    target: str
+    note: str | None = None
+
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
+
+
+class TranslationCache(SQLModel, table=True):
+    """Translated chunks, keyed by a hash of what was asked for.
+
+    Re-running a translation after fixing one chapter should not pay to
+    translate the other four thousand again, and LLM calls are billed per
+    token.
+    """
+
+    __tablename__ = "translation_cache"
+
+    #: sha256 of provider + languages + source text.
+    key: str = Field(primary_key=True)
+    provider: str = Field(index=True)
+    source_lang: str
+    target_lang: str
+    text: str
+    created_at: datetime = Field(default_factory=utcnow)
+
+
 class Setting(SQLModel, table=True):
     """Key/value store for runtime config (proxy, cookies, API keys, limits).
 

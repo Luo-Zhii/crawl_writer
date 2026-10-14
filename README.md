@@ -66,7 +66,7 @@ make lint   # ruff + tsc
 - [x] UI quản lý crawl và thư viện
 - [x] Playwright cho site Cloudflare (xem phần giới hạn bên dưới)
 - [x] Adapter site Trung (đang có: uukanshu, czbooks)
-- [ ] Dịch raw Trung sang Việt
+- [x] Dịch raw Trung sang Việt + glossary (xem phần giới hạn bên dưới)
 - [ ] Trình đọc trong web
 - [ ] Theo dõi và tự cập nhật chương mới
 
@@ -323,3 +323,71 @@ dạng kia, nên bước dịch sẽ chuẩn hoá về một dạng trước.
 Encoding: nhiều site Trung khai GBK/GB2312 chỉ trong thẻ `<meta>` chứ không
 trong HTTP header, nên `app/fetch/decode.py` ưu tiên meta hơn header và nới
 gb2312/gbk thành gb18030.
+
+## Dịch raw Trung sang Việt
+
+Truyện có `lang=zh` sẽ hiện thêm nút **Dịch sang tiếng Việt** ở trang chi tiết,
+hoặc gọi API:
+
+```bash
+curl -X POST "http://127.0.0.1:8000/api/novels/1/translate" \
+  -H 'Content-Type: application/json' -d '{"force":false}'
+```
+
+Dịch chạy như một job nền giống crawl, nên có thanh tiến độ, tạm dừng và huỷ.
+Bản dịch lưu thành file `.vi.txt` **bên cạnh** bản gốc, không ghi đè, nên dịch
+lại không bao giờ làm mất nguyên văn. Chương đã dịch thì lần chạy sau bỏ qua;
+muốn dịch lại hết thì dùng `force` (nút "Dịch lại toàn bộ").
+
+Xuất bản dịch:
+
+```bash
+curl -OJ "http://127.0.0.1:8000/api/novels/1/export?format=epub&translated=true"
+```
+
+Chương nào chưa dịch sẽ tự lấy bản gốc để sách không bị đứt mạch.
+
+### Glossary tên riêng
+
+Máy dịch hay đọc cùng một tên nhân vật thành ba kiểu khác nhau trong một bộ
+truyện dài, và đó là thứ làm bản dịch khó theo nhất. Trang chi tiết truyện có
+phần **Glossary** để cố định cách đọc (ví dụ 萧炎 → Tiêu Viêm).
+
+Tên riêng được thay **trước khi** gửi đi dịch, vì máy dịch để nguyên chữ Latin
+mà nó không hiểu, còn nhờ nó dịch đúng tên thì không ăn. Sau khi dịch có thêm
+một lượt sửa những tên bị máy bóp méo khoảng trắng hay viết hoa
+("TiêuViêm" → "Tiêu Viêm").
+
+Sửa glossary rồi phải bấm "Dịch lại toàn bộ", vì chương đã dịch được giữ nguyên
+và bản dịch cũ còn trong cache.
+
+### Engine dịch
+
+| Engine | Cần key | Ghi chú |
+| --- | --- | --- |
+| Google Translate | không | mặc định, miễn phí, chất lượng tạm đọc |
+| Gemini / OpenAI / Claude | có | văn phong tốt hơn nhiều, tính tiền theo token |
+
+Key nhập ở trang **Cài đặt**. Google luôn nằm cuối chuỗi provider làm phương án
+cuối: nếu engine trả phí hỏng key hay bị rate limit thì job vẫn chạy xong chứ
+không fail.
+
+Mỗi đoạn dịch xong được cache theo hash, nên dịch lại sau khi sửa một chương
+không phải trả tiền cho cả bộ truyện. Cache tách theo từng engine, vì đổi engine
+mà vẫn trả bản cũ thì sai.
+
+### Giới hạn thật, đã kiểm tra
+
+**Endpoint Google miễn phí rate-limit khá gắt.** Thử trên máy này: crawl 63
+chương tiếng Trung rồi chạy job dịch, cả 63 chương đều trả `google: rate
+limited` (HTTP 429). Thử `curl` trực tiếp tới endpoint cũng 429, nên là IP bị
+chặn chứ không phải lỗi tool.
+
+Phần pipeline vẫn hoạt động đúng: mỗi chương lỗi độc lập, job kết thúc bình
+thường thay vì chết, và **không chương nào bị ghi nội dung rác** — bản gốc giữ
+nguyên, `has_translation` vẫn false, lý do lỗi ghi trên từng chương.
+
+Muốn dịch được thật thì chọn một trong hai:
+
+- Nhập API key LLM ở trang Cài đặt (Gemini rẻ nhất trong ba cái).
+- Dùng proxy ở trang Cài đặt để đổi IP ra khỏi dải đang bị Google chặn.

@@ -170,6 +170,32 @@ class BrowserCheck(BaseModel):
     detail: str
 
 
+class GlossaryTermRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    source: str
+    target: str
+    note: str | None = None
+
+
+class GlossaryTermCreate(BaseModel):
+    source: str = Field(min_length=1, max_length=120)
+    target: str = Field(min_length=1, max_length=200)
+    note: str | None = None
+
+
+class GlossaryBulk(BaseModel):
+    """Whole glossary at once, as source -> target."""
+
+    terms: dict[str, str]
+
+
+class TranslateRequest(BaseModel):
+    #: Re-translate chapters that already have a translation.
+    force: bool = False
+
+
 class PreviewRequest(BaseModel):
     url: str
 

@@ -119,6 +119,13 @@ export interface BrowserCheck {
   detail: string;
 }
 
+export interface GlossaryTerm {
+  id: number;
+  source: string;
+  target: string;
+  note: string | null;
+}
+
 /** One frame from the job event stream. */
 export interface ProgressEvent {
   job_id: number;

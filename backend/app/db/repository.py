@@ -16,6 +16,7 @@ from sqlmodel import Session, col, delete, select
 from app.db.models import (
     Chapter,
     ChapterStatus,
+    GlossaryTerm,
     Job,
     JobStatus,
     JobType,
@@ -254,6 +255,63 @@ class JobRepository(_SqlRepository, AbstractJobRepository):
         """Jobs left mid-flight by a crash, so a restart can pick them up."""
         stmt = select(Job).where(col(Job.status).in_([JobStatus.queued, JobStatus.running]))
         return list(self.session.exec(stmt).all())
+
+
+class GlossaryRepository(_SqlRepository):
+    """Per-novel term list used to keep names consistent."""
+
+    def list_for_novel(self, novel_id: int) -> list[GlossaryTerm]:
+        stmt = (
+            select(GlossaryTerm)
+            .where(GlossaryTerm.novel_id == novel_id)
+            .order_by(col(GlossaryTerm.source))
+        )
+        return list(self.session.exec(stmt).all())
+
+    def as_mapping(self, novel_id: int) -> dict[str, str]:
+        return {term.source: term.target for term in self.list_for_novel(novel_id)}
+
+    def get(self, term_id: int) -> GlossaryTerm | None:
+        return self.session.get(GlossaryTerm, term_id)
+
+    def find(self, novel_id: int, source: str) -> GlossaryTerm | None:
+        stmt = select(GlossaryTerm).where(
+            GlossaryTerm.novel_id == novel_id, GlossaryTerm.source == source
+        )
+        return self.session.exec(stmt).first()
+
+    def upsert(
+        self, novel_id: int, source: str, target: str, note: str | None = None
+    ) -> GlossaryTerm:
+        """Add a term, or update the reading of one that already exists."""
+        existing = self.find(novel_id, source)
+        if existing is not None:
+            existing.target = target
+            existing.note = note
+            existing.updated_at = utcnow()
+            return self._save(existing)
+        return self._save(
+            GlossaryTerm(novel_id=novel_id, source=source, target=target, note=note)
+        )
+
+    def delete(self, term: GlossaryTerm) -> None:
+        self.session.delete(term)
+        self.session.commit()
+
+    def replace_all(self, novel_id: int, terms: dict[str, str]) -> int:
+        """Swap the whole glossary for a novel. Used by bulk import."""
+        self.session.exec(
+            delete(GlossaryTerm).where(col(GlossaryTerm.novel_id) == novel_id)
+        )
+        for source, target in terms.items():
+            if source.strip() and target.strip():
+                self.session.add(
+                    GlossaryTerm(
+                        novel_id=novel_id, source=source.strip(), target=target.strip()
+                    )
+                )
+        self.session.commit()
+        return len(self.list_for_novel(novel_id))
 
 
 class SettingRepository(_SqlRepository, AbstractSettingRepository):

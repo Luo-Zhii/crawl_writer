@@ -7,6 +7,7 @@ import type {
   ChapterStatus,
   ChapterSummary,
   ExportFormat,
+  GlossaryTerm,
   Job,
   JobStatus,
   NovelDetail,
@@ -157,3 +158,19 @@ export const deleteCookie = (domain: string) =>
   api.delete<AppSettings>(`/settings/cookies/${encodeURIComponent(domain)}`);
 
 export const checkBrowser = () => api.post<BrowserCheck>("/settings/browser-check");
+
+// --- translation -----------------------------------------------------------
+
+export const listGlossary = (novelId: number) =>
+  api.get<GlossaryTerm[]>(`/novels/${novelId}/glossary`);
+
+export const addGlossaryTerm = (
+  novelId: number,
+  term: { source: string; target: string; note?: string },
+) => api.post<GlossaryTerm>(`/novels/${novelId}/glossary`, term);
+
+export const deleteGlossaryTerm = (novelId: number, termId: number) =>
+  api.delete<void>(`/novels/${novelId}/glossary/${termId}`);
+
+export const startTranslation = (novelId: number, force = false) =>
+  api.post<Job>(`/novels/${novelId}/translate`, { force });

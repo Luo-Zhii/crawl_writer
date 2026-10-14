@@ -24,6 +24,7 @@ from app.fetch.smart import SmartFetcher
 from app.pipeline.control import JobControl
 from app.pipeline.crawler import CrawlRunner
 from app.pipeline.events import EventHub, Progress
+from app.pipeline.translator import TranslateRunner
 
 log = get_logger(__name__)
 
@@ -39,11 +40,13 @@ class JobManager:
         hub: EventHub | None = None,
         settings: Settings | None = None,
         runner_factory: RunnerFactory | None = None,
+        translate_runner_factory=None,
         workers: int = 1,
     ) -> None:
         self.hub = hub or EventHub()
         self.settings = settings or get_settings()
         self._runner_factory = runner_factory
+        self._translate_runner_factory = translate_runner_factory
         self._workers = max(workers, 1)
         self._queue: asyncio.Queue[int] = asyncio.Queue()
         self._tasks: list[asyncio.Task[None]] = []
@@ -207,12 +210,26 @@ class JobManager:
                 log.info("skipping job %s: cancelled before it started", job_id)
                 return
 
+            job_type = job.type
+
         control = JobControl()
         self._controls[job_id] = control
         try:
-            await self._runner().run(job_id, control)
+            await self._runner_for(job_type).run(job_id, control)
         finally:
             self._controls.pop(job_id, None)
+
+    def _runner_for(self, job_type: JobType):
+        """Pick the runner for a job type.
+
+        Translation is a separate runner because it touches no network beyond
+        the translation API and must never re-download a chapter.
+        """
+        if job_type is JobType.translate:
+            if self._translate_runner_factory is not None:
+                return self._translate_runner_factory()
+            return TranslateRunner(hub=self.hub, settings=self.settings)
+        return self._runner()
 
     def _runner(self) -> CrawlRunner:
         if self._runner_factory is not None:
