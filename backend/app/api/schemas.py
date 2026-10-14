@@ -7,10 +7,11 @@ tables change, and so internal fields never leak by accident.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
 
-from app.db.models import ChapterStatus, Lang, NovelStatus
+from app.db.models import ChapterStatus, JobStatus, JobType, Lang, NovelStatus
 
 
 class ChapterSummary(BaseModel):
@@ -80,3 +81,56 @@ class NovelUpdate(BaseModel):
     author: str | None = None
     followed: bool | None = None
     translate_enabled: bool | None = None
+
+
+class JobCreate(BaseModel):
+    """Start a crawl, either from a URL or for a novel already in the library."""
+
+    url: str | None = None
+    novel_id: int | None = None
+    type: JobType = JobType.crawl
+
+
+class JobRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    type: JobType
+    status: JobStatus
+    novel_id: int | None = None
+    total: int
+    done: int
+    failed: int
+    skipped: int
+    error: str | None = None
+    params: dict[str, Any] = {}
+    created_at: datetime
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+
+    @computed_field
+    @property
+    def processed(self) -> int:
+        return self.done + self.failed + self.skipped
+
+    @computed_field
+    @property
+    def percent(self) -> float:
+        return round(self.processed / self.total * 100, 1) if self.total else 0.0
+
+
+class JobListResponse(BaseModel):
+    items: list[JobRead]
+    total: int
+    limit: int
+    offset: int
+
+
+class SourceInfo(BaseModel):
+    """A registered adapter, for the "which sites work" screen."""
+
+    key: str
+    name: str
+    domains: list[str]
+    lang: Lang
+    needs_browser: bool

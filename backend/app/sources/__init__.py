@@ -8,6 +8,7 @@ by the time anything calls :func:`app.sources.registry.resolve`.
 # is kept below the shared definitions it depends on.
 from app.sources import truyenhoan  # noqa: F401  (side effect: registration)
 from app.sources.base import (
+    ChapterLocked,
     ChapterRef,
     NovelInfo,
     NovelRef,
@@ -24,6 +25,7 @@ from app.sources.registry import (
 )
 
 __all__ = [
+    "ChapterLocked",
     "ChapterRef",
     "NovelInfo",
     "NovelRef",

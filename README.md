@@ -61,7 +61,7 @@ make lint   # ruff + tsc
 - [x] DB và storage layer
 - [x] Fetcher (retry, rate limit, phát hiện bị chặn)
 - [x] Source adapter cho từng site (đang có: truyenhoan)
-- [ ] Crawl pipeline có resume
+- [x] Crawl pipeline có resume
 - [ ] Xuất TXT / JSON / EPUB
 - [ ] UI quản lý crawl và thư viện
 - [ ] Playwright cho site Cloudflare
@@ -129,3 +129,42 @@ Mỗi site là một adapter trong `backend/app/sources/`, cùng chung một con
 CLI phân biệt rõ nguyên nhân lỗi: `BLOCKED` là site chặn (cần browser, proxy
 hoặc cookie), `LAYOUT` là markup đổi nên selector cần sửa, `FAILED` là lỗi
 mạng.
+
+## Crawl một truyện
+
+Qua CLI, chạy ngay ở foreground:
+
+```bash
+cd backend
+../.venv/bin/python -m app.cli crawl download "<url truyện>"
+../.venv/bin/python -m app.cli jobs            # xem job gần đây
+```
+
+Qua API, chạy nền trong server:
+
+```bash
+# tạo job
+curl -X POST http://127.0.0.1:8000/api/jobs \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"<url truyện>"}'
+
+# theo tiến độ (SSE: event snapshot đầu tiên, rồi progress từng chương)
+curl -N http://127.0.0.1:8000/api/jobs/1/events
+
+# tạm dừng / chạy lại / huỷ
+curl -X POST http://127.0.0.1:8000/api/jobs/1/pause
+curl -X POST http://127.0.0.1:8000/api/jobs/1/resume
+curl -X POST http://127.0.0.1:8000/api/jobs/1/cancel
+
+# tải chương mới của truyện đã có
+curl -X POST http://127.0.0.1:8000/api/novels/1/update
+```
+
+Ngắt giữa chừng không mất gì. Chương đã có trên đĩa thì lần chạy sau bỏ qua,
+và job còn dở sẽ được tự đưa lại vào hàng đợi khi server khởi động lại.
+Chương VIP được ghi là `skipped_vip` chứ không tính là lỗi, chương lỗi sẽ
+retry tới giới hạn `CRAWLW_CHAPTER_RETRY_LIMIT`.
+
+Tốc độ crawl bị giới hạn có chủ đích (`CRAWLW_PER_DOMAIN_DELAY`, mặc định
+0.6s mỗi request và 4 request song song mỗi host), nên truyện vài trăm chương
+sẽ mất vài phút. Đừng tăng lên quá cao nếu không muốn bị site chặn.

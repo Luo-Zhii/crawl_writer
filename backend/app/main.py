@@ -11,6 +11,8 @@ from app import __version__
 from app.api.router import api_router
 from app.core.logging import get_logger, setup_logging
 from app.core.settings import get_settings
+from app.db.session import create_db_and_tables
+from app.pipeline.manager import JobManager
 
 log = get_logger(__name__)
 
@@ -20,9 +22,20 @@ async def lifespan(app: FastAPI):
     setup_logging()
     settings = get_settings()
     settings.ensure_dirs()
+    create_db_and_tables()
     log.info("crawl_writer %s starting, data dir: %s", __version__, settings.data_dir)
-    yield
-    log.info("crawl_writer shutting down")
+
+    # The worker lives for the life of the process. Starting it here also
+    # picks up any crawl a previous run left unfinished.
+    manager = JobManager(settings=settings)
+    app.state.job_manager = manager
+    await manager.start()
+
+    try:
+        yield
+    finally:
+        await manager.stop()
+        log.info("crawl_writer shutting down")
 
 
 def create_app() -> FastAPI:

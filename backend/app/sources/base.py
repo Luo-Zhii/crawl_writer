@@ -64,6 +64,14 @@ class SourceError(Exception):
         self.url = url
 
 
+class ChapterLocked(SourceError):
+    """The chapter exists but is paid or members-only.
+
+    Not a failure: there is nothing to retry and nothing to fix, so the crawl
+    records it as skipped and moves on.
+    """
+
+
 class Source(ABC):
     """Base class for site adapters."""
 

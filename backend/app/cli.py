@@ -278,6 +278,81 @@ def crawl_search(
     raise typer.Exit(asyncio.run(run()))
 
 
+@crawl_app.command("download")
+def crawl_download(
+    url: str = typer.Argument(..., help="Novel page URL"),
+    limit: int | None = typer.Option(None, help="Stop after this many chapters"),
+) -> None:
+    """Run a full crawl in the foreground, printing progress as it goes.
+
+    Same pipeline the web UI drives, just without the server. Re-running it
+    picks up where the last run stopped.
+    """
+    import asyncio
+
+    from app.db.session import create_db_and_tables
+    from app.fetch import HttpFetcher
+    from app.pipeline import CrawlRunner, EventHub, JobControl
+    from app.pipeline.manager import JobManager
+
+    setup_logging()
+    create_db_and_tables()
+
+    async def run() -> int:
+        hub = EventHub()
+        manager = JobManager(hub=hub)
+        job = manager.create_job(url=url, params={"limit": limit} if limit else None)
+        job_id = job.id
+
+        fetcher = HttpFetcher()
+        runner = CrawlRunner(fetcher=fetcher, hub=hub)
+
+        async def show() -> None:
+            async for event in hub.stream(job_id):
+                line = f"[{event.status}] {event.percent:5.1f}%  " \
+                       f"done={event.done} failed={event.failed} skipped={event.skipped}"
+                if event.message:
+                    line += f"  {event.message[:60]}"
+                typer.echo(line)
+
+        watcher = asyncio.create_task(show())
+        try:
+            await runner.run(job_id, JobControl())
+        finally:
+            await fetcher.aclose()
+            await watcher
+
+        with session_scope() as session:
+            from app.db.repository import JobRepository
+
+            final = JobRepository(session).get(job_id)
+            typer.secho(
+                f"job {job_id}: {final.status.value} "
+                f"({final.done} done, {final.failed} failed, {final.skipped} skipped)",
+                fg=typer.colors.GREEN
+                if final.status.value == "done"
+                else typer.colors.YELLOW,
+            )
+            return 0 if final.status.value == "done" else 1
+
+    raise typer.Exit(asyncio.run(run()))
+
+
+@app.command("jobs")
+def list_jobs(limit: int = typer.Option(10, help="How many jobs to show")) -> None:
+    """Show recent jobs and their outcome."""
+    from app.db.repository import JobRepository
+
+    setup_logging()
+    with session_scope() as session:
+        for job in JobRepository(session).list(limit=limit):
+            typer.echo(
+                f"#{job.id:<4} {job.type.value:<9} {job.status.value:<10} "
+                f"total={job.total:<5} done={job.done:<5} failed={job.failed:<4} "
+                f"skipped={job.skipped:<4} {job.error or ''}"[:140]
+            )
+
+
 @app.command("sources")
 def list_sources() -> None:
     """Show every registered adapter."""
