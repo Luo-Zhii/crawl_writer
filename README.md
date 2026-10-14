@@ -60,7 +60,7 @@ make lint   # ruff + tsc
 - [x] Scaffold backend + frontend
 - [x] DB và storage layer
 - [x] Fetcher (retry, rate limit, phát hiện bị chặn)
-- [x] Source adapter cho từng site (đang có: truyenhoan)
+- [x] Source adapter cho từng site (đang có: truyenhoan, truyendich)
 - [x] Crawl pipeline có resume
 - [x] Xuất TXT / JSON / EPUB
 - [x] UI quản lý crawl và thư viện
@@ -202,3 +202,33 @@ dùng `--volume-size`: file sẽ được chia thành nhiều phần và gói tr
 
 Thêm `translated=true` để xuất bản dịch; chương nào chưa dịch thì tự lấy bản
 gốc, nên sách vẫn liền mạch.
+
+## Tình hình các site truyện Việt
+
+Khảo sát trực tiếp (tháng 10/2026), gần 50 domain. Kết quả không vui:
+
+| Site | Tình trạng |
+| --- | --- |
+| truyenhoan.com (cũ: truyenfull.tv) | **chạy được**, đã có adapter |
+| truyendich.vn | **chạy được**, đã có adapter |
+| truyencv.com | đóng cửa, trang chỉ còn chữ "Tạm biệt!" |
+| metruyencv.net | đóng cửa, cùng thông báo như trên |
+| metruyencv.com | sống nhưng Cloudflare chặn, cần Playwright |
+| bachngocsach.cc | "BNS Reader ngừng hoạt động" |
+| truyenchu.com.vn | sống nhưng danh sách chương render bằng JS, cần Playwright |
+| webtruyen.com, truyenviet.vn | sống, chưa khảo sát xong cấu trúc |
+| nhattruyen.com | domain đang được bán |
+| 4vn.eu, hoasontrang.us | domain đã đổi sang mục đích khác |
+| tangthuvien.net/.vn, truyenfull.vn/.io/.vip, wikidich.*, truyenyy.*, sstruyen.*, dtruyen.com, và ~20 domain khác | không kết nối được |
+
+Nên đừng ngạc nhiên nếu một site hôm nay chạy mai lại chết. Domain nằm trong
+`domains` của từng adapter nên đổi domain chỉ cần sửa một dòng. Dò nhanh bằng:
+
+```bash
+cd backend
+../.venv/bin/python -m app.cli fetch "https://site.example/" --head 0
+```
+
+Hai site cùng dùng chung template (họ "truyenfull") nên phần đọc HTML nằm ở
+`app/sources/vi_truyenfull.py`, mỗi adapter chỉ khai báo dạng URL riêng. Thêm
+một site cùng họ chỉ mất khoảng 20 dòng.
