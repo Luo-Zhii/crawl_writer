@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable, Iterable
+from pathlib import Path
+from urllib.parse import urlsplit
 
 from app.core.logging import get_logger
 from app.core.settings import Settings, get_settings
@@ -127,6 +129,7 @@ class CrawlRunner:
         self._publish(job_id, JobStatus.running, message="reading novel info")
         info = await source.novel_info(url)
         novel_id = self._upsert_novel(source.key, info)
+        await self._ensure_cover(novel_id, info.cover_url, referer=url)
 
         await control.checkpoint()
 
@@ -303,6 +306,35 @@ class CrawlRunner:
             else:
                 novel = repo.update(novel, **fields)
             return novel.id
+
+    async def _ensure_cover(
+        self, novel_id: int, cover_url: str | None, *, referer: str | None = None
+    ) -> None:
+        """Download the cover once, for the EPUB export to embed later.
+
+        Entirely optional: a missing cover is a cosmetic problem, so any
+        failure here is logged and ignored rather than failing the crawl.
+        """
+        if not cover_url or self.storage.find_cover(novel_id) is not None:
+            return
+
+        get_bytes = getattr(self.fetcher, "get_bytes", None)
+        if get_bytes is None:
+            return
+
+        try:
+            data = await get_bytes(cover_url, referer=referer)
+        except Exception as exc:  # noqa: BLE001 - cover is never worth failing for
+            log.debug("could not fetch cover %s: %s", cover_url, exc)
+            return
+
+        if not data:
+            return
+
+        suffix = Path(urlsplit(cover_url).path).suffix.lower()
+        if suffix not in (".jpg", ".jpeg", ".png", ".webp"):
+            suffix = ".jpg"
+        self.storage.write_cover(novel_id, data, suffix=suffix)
 
     def _sync_chapters(self, novel_id: int, refs: Iterable[ChapterRef]) -> int:
         """Insert rows for chapters we have never seen. Returns how many."""

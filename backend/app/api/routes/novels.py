@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import FileResponse
 from sqlmodel import Session
 
 from app.api.schemas import (
@@ -17,6 +18,7 @@ from app.db.models import ChapterStatus
 from app.db.repository import ChapterRepository, NovelRepository
 from app.db.session import get_session
 from app.db.storage import ChapterStorage, get_storage
+from app.export import ExportFormat, ExportService, NothingToExport
 
 router = APIRouter(prefix="/novels", tags=["novels"])
 
@@ -97,6 +99,47 @@ def delete_novel(
     # missing text is not.
     repo.delete(novel)
     storage.delete_novel(novel_id)
+
+
+@router.get("/{novel_id}/export")
+def export_novel(
+    novel_id: int,
+    fmt: ExportFormat = Query(ExportFormat.epub, alias="format"),
+    translated: bool = Query(False, description="Export the translation when there is one"),
+    volume_size: int | None = Query(
+        None,
+        ge=50,
+        le=5000,
+        description="Split into parts of this many chapters and return a zip",
+    ),
+    session: Session = Depends(get_session),
+    storage: ChapterStorage = Depends(get_storage),
+) -> FileResponse:
+    """Build the file and return it.
+
+    Generation is synchronous: a few thousand chapters take a couple of
+    seconds, which is faster than making the client poll a job.
+    """
+    if NovelRepository(session).get(novel_id) is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Novel not found")
+
+    service = ExportService(storage=storage)
+    try:
+        result = service.export(
+            novel_id, fmt, translated=translated, volume_size=volume_size
+        )
+    except NothingToExport as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+
+    return FileResponse(
+        result.path,
+        media_type=result.media_type,
+        filename=result.filename,
+        headers={
+            "X-Export-Chapters": str(result.chapters),
+            "X-Export-Parts": str(result.parts),
+        },
+    )
 
 
 @router.get("/{novel_id}/chapters", response_model=ChapterListResponse)

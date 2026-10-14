@@ -55,6 +55,27 @@ class ChapterStorage:
     def exists(self, novel_id: int, number: int, *, translated: bool = False) -> bool:
         return self.path(novel_id, number, translated=translated).exists()
 
+    # --- cover -------------------------------------------------------------
+
+    def cover_path(self, novel_id: int, suffix: str = ".jpg") -> Path:
+        return self.novel_dir(novel_id) / f"cover{suffix}"
+
+    def find_cover(self, novel_id: int) -> Path | None:
+        """Locate a stored cover, whatever extension it was saved under."""
+        for suffix in (".jpg", ".jpeg", ".png", ".webp"):
+            candidate = self.cover_path(novel_id, suffix)
+            if candidate.exists():
+                return candidate
+        return None
+
+    def write_cover(self, novel_id: int, data: bytes, suffix: str = ".jpg") -> Path:
+        target = self.cover_path(novel_id, suffix)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        tmp = target.with_suffix(target.suffix + ".part")
+        tmp.write_bytes(data)
+        tmp.replace(target)
+        return target
+
     # --- cleanup -----------------------------------------------------------
 
     def delete_chapter(self, novel_id: int, number: int) -> None:

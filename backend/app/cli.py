@@ -338,6 +338,50 @@ def crawl_download(
     raise typer.Exit(asyncio.run(run()))
 
 
+@app.command("export")
+def export_novel(
+    novel_id: int = typer.Argument(..., help="Novel id (see the library)"),
+    fmt: str = typer.Option("epub", "--format", help="epub, txt or json"),
+    translated: bool = typer.Option(False, help="Export the translation if there is one"),
+    volume_size: int | None = typer.Option(
+        None, help="Split EPUB into parts of this many chapters"
+    ),
+) -> None:
+    """Write a downloaded novel out as EPUB, TXT or JSON."""
+    from app.export import ExportFormat, ExportService, NothingToExport
+
+    setup_logging()
+
+    try:
+        chosen = ExportFormat(fmt.lower())
+    except ValueError:
+        typer.secho(
+            f"Unknown format: {fmt} (use epub, txt or json)", fg=typer.colors.RED
+        )
+        raise typer.Exit(2) from None
+
+    try:
+        result = ExportService().export(
+            novel_id, chosen, translated=translated, volume_size=volume_size
+        )
+    except LookupError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED)
+        raise typer.Exit(3) from None
+    except NothingToExport as exc:
+        typer.secho(str(exc), fg=typer.colors.YELLOW)
+        raise typer.Exit(4) from None
+
+    typer.secho(f"wrote {result.path}", fg=typer.colors.GREEN)
+    typer.echo(f"chapters {result.chapters}")
+    typer.echo(f"parts    {result.parts}")
+    typer.echo(f"size     {result.size_bytes / 1024:.0f} KiB")
+    if result.missing:
+        typer.echo(
+            f"missing  {len(result.missing)} chapter(s) had no text, e.g. "
+            f"{result.missing[:8]}"
+        )
+
+
 @app.command("jobs")
 def list_jobs(limit: int = typer.Option(10, help="How many jobs to show")) -> None:
     """Show recent jobs and their outcome."""

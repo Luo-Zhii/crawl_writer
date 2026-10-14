@@ -62,7 +62,7 @@ make lint   # ruff + tsc
 - [x] Fetcher (retry, rate limit, phát hiện bị chặn)
 - [x] Source adapter cho từng site (đang có: truyenhoan)
 - [x] Crawl pipeline có resume
-- [ ] Xuất TXT / JSON / EPUB
+- [x] Xuất TXT / JSON / EPUB
 - [ ] UI quản lý crawl và thư viện
 - [ ] Playwright cho site Cloudflare
 - [ ] Adapter site Trung + dịch sang Việt
@@ -168,3 +168,37 @@ retry tới giới hạn `CRAWLW_CHAPTER_RETRY_LIMIT`.
 Tốc độ crawl bị giới hạn có chủ đích (`CRAWLW_PER_DOMAIN_DELAY`, mặc định
 0.6s mỗi request và 4 request song song mỗi host), nên truyện vài trăm chương
 sẽ mất vài phút. Đừng tăng lên quá cao nếu không muốn bị site chặn.
+
+## Xuất file để đọc
+
+```bash
+cd backend
+../.venv/bin/python -m app.cli export 1 --format epub
+../.venv/bin/python -m app.cli export 1 --format txt
+../.venv/bin/python -m app.cli export 1 --format json
+../.venv/bin/python -m app.cli export 1 --format epub --volume-size 500
+```
+
+Qua API:
+
+```bash
+curl -OJ "http://127.0.0.1:8000/api/novels/1/export?format=epub"
+curl -OJ "http://127.0.0.1:8000/api/novels/1/export?format=epub&volume_size=500"
+curl -OJ "http://127.0.0.1:8000/api/novels/1/export?format=txt&translated=true"
+```
+
+File nằm trong `data/exports/`.
+
+- **EPUB** có mục lục, metadata (tác giả, thể loại, nguồn) và ảnh bìa nếu
+  crawl đã tải được. Đây là định dạng nên dùng để đọc trên điện thoại hay
+  máy đọc sách.
+- **TXT** một file duy nhất, mở được ở mọi nơi.
+- **JSON** để xử lý tiếp bằng script.
+
+Truyện tải dở vẫn xuất được, chỉ gồm những chương đã có. Truyện quá dài thì
+dùng `--volume-size`: file sẽ được chia thành nhiều phần và gói trong một
+`.zip`, vì một EPUB vài nghìn chương mở rất chậm trên điện thoại và có app
+đọc sách bỏ luôn không mở.
+
+Thêm `translated=true` để xuất bản dịch; chương nào chưa dịch thì tự lấy bản
+gốc, nên sách vẫn liền mạch.

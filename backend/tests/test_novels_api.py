@@ -167,3 +167,84 @@ def test_chapter_list_pagination(client: TestClient, novel_factory):
 
 def test_chapter_list_404_for_unknown_novel(client: TestClient):
     assert client.get("/api/novels/4242/chapters").status_code == 404
+
+
+# --- export ----------------------------------------------------------------
+
+
+def _seed_text(novel_id: int, chapters: int) -> None:
+    storage = ChapterStorage()
+    for number in range(1, chapters + 1):
+        storage.write(novel_id, number, f"Chương {number}\n\nNội dung đủ dài để xuất bản.")
+
+
+def test_export_epub_downloads_a_file(client: TestClient, novel_factory):
+    novel = novel_factory(title="Kiếm Khách Vô Danh", chapters=2)
+    _seed_text(novel.id, 2)
+
+    resp = client.get(f"/api/novels/{novel.id}/export?format=epub")
+
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/epub+zip"
+    assert "kiem-khach-vo-danh.epub" in resp.headers["content-disposition"]
+    assert resp.headers["x-export-chapters"] == "2"
+    # EPUBs are zip archives, so the magic bytes are a cheap sanity check.
+    assert resp.content[:2] == b"PK"
+
+
+def test_export_defaults_to_epub(client: TestClient, novel_factory):
+    novel = novel_factory(chapters=1)
+    _seed_text(novel.id, 1)
+
+    resp = client.get(f"/api/novels/{novel.id}/export")
+
+    assert resp.headers["content-type"] == "application/epub+zip"
+
+
+def test_export_txt(client: TestClient, novel_factory):
+    novel = novel_factory(title="Tiên Môn", chapters=2)
+    _seed_text(novel.id, 2)
+
+    resp = client.get(f"/api/novels/{novel.id}/export?format=txt")
+
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/plain")
+    assert "Tiên Môn" in resp.text
+
+
+def test_export_json(client: TestClient, novel_factory):
+    novel = novel_factory(chapters=2)
+    _seed_text(novel.id, 2)
+
+    resp = client.get(f"/api/novels/{novel.id}/export?format=json")
+
+    assert resp.status_code == 200
+    assert resp.json()["export"]["chapter_count"] == 2
+
+
+def test_export_rejects_an_unknown_format(client: TestClient, novel_factory):
+    novel = novel_factory(chapters=1)
+
+    assert client.get(f"/api/novels/{novel.id}/export?format=pdf").status_code == 422
+
+
+def test_export_validates_volume_size(client: TestClient, novel_factory):
+    novel = novel_factory(chapters=1)
+
+    assert client.get(
+        f"/api/novels/{novel.id}/export?volume_size=1"
+    ).status_code == 422
+
+
+def test_export_conflicts_when_nothing_is_downloaded(client: TestClient, novel_factory):
+    """Rows exist but no text on disk yet: a 409, not an empty book."""
+    novel = novel_factory(chapters=2, chapter_status=ChapterStatus.pending)
+
+    resp = client.get(f"/api/novels/{novel.id}/export?format=txt")
+
+    assert resp.status_code == 409
+    assert "crawl" in resp.json()["detail"].lower()
+
+
+def test_export_404s_for_unknown_novel(client: TestClient):
+    assert client.get("/api/novels/4242/export").status_code == 404
