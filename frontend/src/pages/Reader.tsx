@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { listChapters, readChapter, saveProgress } from "../api/client";
 import { Badge, ErrorBox, Spinner } from "../components/Bits";
+import { AudioPlayer } from "../components/AudioPlayer";
 import { FONT_RANGE, WIDTH_RANGE, useReaderPrefs } from "../hooks/useReaderPrefs";
 
 export default function Reader() {
@@ -108,6 +109,12 @@ export default function Reader() {
 
       <h1 className="reader-title">{data.title}</h1>
       {data.translated && <Badge tone="accent">bản dịch</Badge>}
+
+      <AudioPlayer
+        chapterNumber={data.number}
+        chapterText={data.text}
+        language="vi"
+      />
 
       <div
         className="reader-body"
