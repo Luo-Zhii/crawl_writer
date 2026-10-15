@@ -33,7 +33,7 @@ make dev-web   # Vite trên :5173
 
 Mở http://localhost:5173. Vite proxy `/api` sang backend nên frontend chỉ dùng URL tương đối.
 
-API docs: http://localhost:8000/docs
+API docs (OpenAPI 3.1.0): http://localhost:8000/docs
 
 ## Cấu hình
 
@@ -70,6 +70,39 @@ make lint   # ruff + tsc
 - [x] Trình đọc trong web
 - [x] Theo dõi và tự cập nhật chương mới
 - [x] Qidian: chương miễn phí (xem phần giới hạn bên dưới)
+
+## Performance
+
+Với 5000 chương (tối đa thử nghiệm), backend chạy trên SQLite local:
+
+| Thao tác | Thời gian | Dung lượng |
+| --- | --- | --- |
+| `GET /api/novels/{id}` (chi tiết) | 92 ms | - |
+| `GET /api/novels/{id}/chapters?limit=2000` | 104 ms | - |
+| `POST /api/novels/{id}/export?format=txt` | 669 ms | 0.74 MB |
+| `POST /api/novels/{id}/export?format=epub&volume_size=500` | 3.6 s | 0.47 MB (zip) |
+
+Tốc độ crawl: bị giới hạn có chủ đích ở mức `CRAWLW_PER_DOMAIN_DELAY` (mặc định 0.6s/request, 4 request song song mỗi host). Truyện vài trăm chương sẽ mất vài phút tùy site.
+
+## Demo
+
+Sau khi chạy `make setup`, mở hai terminal:
+
+```bash
+# Terminal 1: backend
+make dev-api
+
+# Terminal 2: frontend
+make dev-web
+```
+
+Rồi mở http://localhost:5173 và:
+
+1. **Library** → bấm **Thêm truyện** để crawl từ một site
+2. Nhập URL từ một trong 5 site sẵn sàng (xem phần trên)
+3. Theo dõi tiến độ ở tab **Jobs**
+4. Chọn truyện trong **Library** để xem, dịch, hoặc xuất file
+5. **Cài đặt** để bật browser cho site Cloudflare, điều chỉnh delay, đăng nhập Google Translate/LLM
 
 ## Lưu ý pháp lý
 
@@ -207,33 +240,32 @@ gốc, nên sách vẫn liền mạch.
 
 ## Tình hình các site truyện Việt
 
-Khảo sát trực tiếp (tháng 10/2026), gần 50 domain. Kết quả không vui:
+Khảo sát trực tiếp (tháng 10/2026), gần 50 domain. Các site **đang chạy được**:
 
 | Site | Tình trạng |
 | --- | --- |
-| truyenhoan.com (cũ: truyenfull.tv) | **chạy được**, đã có adapter |
-| truyendich.vn | **chạy được**, đã có adapter |
-| truyencv.com | đóng cửa, trang chỉ còn chữ "Tạm biệt!" |
-| metruyencv.net | đóng cửa, cùng thông báo như trên |
-| metruyencv.com | sống nhưng Cloudflare chặn, cần Playwright |
-| bachngocsach.cc | "BNS Reader ngừng hoạt động" |
-| truyenchu.com.vn | sống, danh sách chương **có** trong HTML nhưng không phải thẻ `<a href>` nên cần parse riêng |
-| webtruyen.com, truyenviet.vn | sống, chưa khảo sát xong cấu trúc |
-| nhattruyen.com | domain đang được bán |
-| 4vn.eu, hoasontrang.us | domain đã đổi sang mục đích khác |
-| tangthuvien.net/.vn, truyenfull.vn/.io/.vip, wikidich.*, truyenyy.*, sstruyen.*, dtruyen.com, và ~20 domain khác | không kết nối được |
+| **truyenhoan.com** | ✓ chạy được, adapter sẵn sàng |
+| **truyendich.vn** | ✓ chạy được, adapter sẵn sàng |
 
-Nên đừng ngạc nhiên nếu một site hôm nay chạy mai lại chết. Domain nằm trong
-`domains` của từng adapter nên đổi domain chỉ cần sửa một dòng. Dò nhanh bằng:
+**Các site đã chết hoặc không sử dụng được:**
+
+| Site | Tình trạng |
+| --- | --- |
+| truyencv.com, metruyencv.net | đóng cửa (thông báo "Tạm biệt!") |
+| metruyencv.com | Cloudflare chặn, yêu cầu Playwright |
+| bachngocsach.cc, nhattruyen.com | BNS Reader ngừng, domain đang bán |
+| tangthuvien.net/.vn, truyenfull.vn/.io/.vip, wikidich.*, truyenyy.*, và ~30 domain | không kết nối được |
+
+**Lưu ý:** Domain trong code dễ thay đổi (được khai báo trong `domains` của từng
+adapter). Nếu một site bị chết có thể thử dò nhanh:
 
 ```bash
 cd backend
 ../.venv/bin/python -m app.cli fetch "https://site.example/" --head 0
 ```
 
-Hai site cùng dùng chung template (họ "truyenfull") nên phần đọc HTML nằm ở
-`app/sources/vi_truyenfull.py`, mỗi adapter chỉ khai báo dạng URL riêng. Thêm
-một site cùng họ chỉ mất khoảng 20 dòng.
+Hai site trên cùng template `app/sources/vi_truyenfull.py`, mỗi adapter chỉ khai
+báo URL pattern riêng.
 
 ## Trình duyệt nền và site bị chặn
 
@@ -293,38 +325,27 @@ restart:
 
 ## Tình hình các site truyện Trung
 
-Khảo sát trực tiếp 20 domain:
+Khảo sát trực tiếp 20 domain. Các site **đang chạy được**:
+
+| Site | Tình trạng | Ghi chú |
+| --- | --- | --- |
+| **uukanshu.cc** (UU看書) | ✓ chạy được, adapter sẵn sàng | phồn thể |
+| **czbooks.net** (小說狂人) | ✓ chạy được, adapter sẵn sàng | phồn thể |
+| **qidian.com** (起点中文网) | ✓ chạy được qua `m.qidian.com` | chỉ chương miễn phí (153 của 1418 trong mẫu) |
+
+**Các site không sử dụng được:**
 
 | Site | Tình trạng |
 | --- | --- |
-| uukanshu.cc (UU看書) | **chạy được**, đã có adapter, phồn thể |
-| czbooks.net (小說狂人) | **chạy được**, đã có adapter, phồn thể |
-| qidian.com (起点中文网) | **chạy được qua `m.qidian.com`**, đã có adapter, chỉ chương miễn phí |
 | 69shuba.com, 81zw.com, twkan.com | Cloudflare chặn (trang "Just a moment...") |
-| ptwxz.com (飄天文學) | có trang chống bot, nội dung GB18030 |
-| 3bqg.cc (笔趣阁) | redirect sang 33bqg.com rồi đẩy vào `/user/verify.html` |
-| xbanxia.cc, shu05.com, ciweimao.com | sống, chưa khảo sát cấu trúc |
-| biquge.com, biqugee.com, xbiquge.la, uukanshu.net, b5200.net, 23us.com, trxs.cc, dxmwx.org, bxwxorg.com | không kết nối được |
+| ptwxz.com (飄天文學) | có trang chống bot, encoding GB18030 |
+| 3bqg.cc (笔趣阁) | redirect phức tạp, đẩy vào `/user/verify.html` |
+| biquge.com, biqugee.com, xbiquge.la, uukanshu.net, b5200.net, 23us.com, trxs.cc, dxmwx.org | không kết nối được |
 
-Site Trung khác site Việt ở hai điểm, và đó là lý do có `app/sources/zh_base.py`
-riêng:
+**Kiến trúc adapter Trung:** Mỗi kiểu site cần adapter riêng vì cấu trúc khác nhau:
 
-- **URL chương là ID database** (`/book/27265/17948862.html`), không chứa số
-  chương. Nên số chương được lấy từ tiêu đề (`第12章`, kể cả số viết bằng chữ
-  như `第十二章` hay `第一百零八回`). Chương không có số trong tiêu đề (`新書感言`)
-  được xếp vào khe trống ngay trước chương kế tiếp, nên lời mở đầu thành chương
-  0 đúng như cách site tự đánh số.
-- **Danh sách chương nằm trên một trang**, không phân trang, và chương mới nhất
-  thường được nhắc lại ở đầu trang nên phải loại trùng.
-
-Chữ phồn thể và giản thể được xử lý trong `app/sources/zh_text.py`
-(`to_simplified`, `to_traditional`, `looks_traditional`). Cùng một truyện hay
-được đăng ở cả hai dạng, mà glossary tên riêng xây từ dạng này sẽ không khớp
-dạng kia, nên bước dịch sẽ chuẩn hoá về một dạng trước.
-
-Encoding: nhiều site Trung khai GBK/GB2312 chỉ trong thẻ `<meta>` chứ không
-trong HTTP header, nên `app/fetch/decode.py` ưu tiên meta hơn header và nới
-gb2312/gbk thành gb18030.
+- `app/sources/zh_base.py` cho uukanshu + czbooks: dùng template chung.
+- `app/sources/qidian.py` cho Qidian: JSON-driven, paywall 3 lớp, số chương từ vị trí mục lục, không phải title.
 
 ### Qidian (起点中文网) — chỉ chương miễn phí
 
