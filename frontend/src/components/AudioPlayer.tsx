@@ -2,33 +2,94 @@
  * Audio player for chapter narration using CapCut TTS
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+interface Voice {
+  id: string;
+  name: string;
+  lang: string;
+  resource_id: string;
+}
+
+interface VoiceResponse {
+  lang: string;
+  count: number;
+  voices: Voice[];
+}
 
 interface AudioPlayerProps {
   chapterNumber: number;
   chapterText: string;
-  language: "vi" | "zh";
+  language: "vi" | "zh" | "en" | "ja" | "th" | "es" | "de" | "fr" | "pt" | "id";
 }
+
+const LANGUAGE_NAMES: Record<string, string> = {
+  "vi-VN": "Tiếng Việt",
+  "vi": "Tiếng Việt",
+  "zh-CN": "中文",
+  "zh": "中文",
+  "en-US": "English",
+  "en": "English",
+  "ja-JP": "日本語",
+  "ja": "日本語",
+  "th-TH": "ไทย",
+  "th": "ไทย",
+  "es-ES": "Español",
+  "es": "Español",
+  "de-DE": "Deutsch",
+  "de": "Deutsch",
+  "fr-FR": "Français",
+  "fr": "Français",
+  "pt-BR": "Português",
+  "pt": "Português",
+  "id-ID": "Bahasa Indonesia",
+  "id": "Bahasa Indonesia",
+};
 
 export function AudioPlayer({ chapterNumber, chapterText, language }: AudioPlayerProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingVoices, setIsLoadingVoices] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [selectedVoice, setSelectedVoice] = useState<string>(
-    language === "vi" ? "BV421_vivn_streaming" : "BV225_zhcn_streaming"
-  );
+  const [voices, setVoices] = useState<Voice[]>([]);
+  const [selectedVoice, setSelectedVoice] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState<string>("");
+
   const [speed, setSpeed] = useState(1.0);
 
-  const voices = {
-    vi: [
-      { id: "BV421_vivn_streaming", name: "👩 Female VN" },
-      { id: "BV422_vivn_streaming", name: "👨 Male VN" },
-    ],
-    zh: [
-      { id: "BV225_zhcn_streaming", name: "👩 Female Mandarin" },
-      { id: "BV226_zhcn_streaming", name: "👨 Male Mandarin" },
-    ],
-  };
+  // Fetch voices for selected language when component mounts or language changes
+  useEffect(() => {
+    const fetchVoices = async () => {
+      setIsLoadingVoices(true);
+      setError(null);
+      try {
+        const response = await fetch(`/api/tts/voices?lang=${language}`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch voices: ${response.statusText}`);
+        }
+        const data: VoiceResponse = await response.json();
+        setVoices(data.voices);
+        setSearchTerm(""); // Reset search when language changes
+        
+        // Set first voice as default
+        if (data.voices.length > 0) {
+          setSelectedVoice(data.voices[0].id);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load voices");
+        setVoices([]);
+      } finally {
+        setIsLoadingVoices(false);
+      }
+    };
+
+    fetchVoices();
+  }, [language]);
+
+  // Filter voices based on search term
+  const filteredVoices = voices.filter((voice) =>
+    voice.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   const generateAudio = async () => {
     setIsLoading(true);
@@ -88,6 +149,14 @@ export function AudioPlayer({ chapterNumber, chapterText, language }: AudioPlaye
       display: "grid",
       gap: "0.8rem",
     },
+    langBadge: {
+      fontSize: "0.85rem",
+      padding: "0.5rem 0.75rem",
+      background: "var(--accent)",
+      color: "var(--accent-text)",
+      borderRadius: "6px",
+      fontWeight: "500",
+    },
     field: {
       display: "grid",
       gap: "0.4rem",
@@ -99,6 +168,24 @@ export function AudioPlayer({ chapterNumber, chapterText, language }: AudioPlaye
     },
     select: {
       width: "100%",
+    },
+    searchInput: {
+      width: "100%",
+      padding: "0.5rem",
+      fontSize: "0.9rem",
+      marginBottom: "0.4rem",
+    },
+    loading: {
+      fontSize: "0.85rem",
+      color: "var(--text-soft)",
+      padding: "0.5rem",
+    },
+    noVoices: {
+      fontSize: "0.85rem",
+      color: "var(--warn)",
+      padding: "0.5rem",
+      background: "rgba(255, 165, 0, 0.1)",
+      borderRadius: "4px",
     },
     slider: {
       width: "100%",
@@ -151,20 +238,61 @@ export function AudioPlayer({ chapterNumber, chapterText, language }: AudioPlaye
       </h3>
 
       <div style={styles.content}>
+        {/* Language info */}
+        <div style={styles.langBadge}>
+          🌐 {LANGUAGE_NAMES[language] || language.toUpperCase()}
+          {isLoadingVoices && " (đang tải giọng...)"}
+        </div>
+
         {/* Voice selector */}
         <div style={styles.field}>
-          <label style={styles.label}>Chọn giọng đọc:</label>
-          <select
-            value={selectedVoice}
-            onChange={(e) => setSelectedVoice(e.target.value)}
-            style={styles.select}
-          >
-            {voices[language].map((voice) => (
-              <option key={voice.id} value={voice.id}>
-                {voice.name}
-              </option>
-            ))}
-          </select>
+          <label style={styles.label}>
+            Chọn giọng đọc ({filteredVoices.length}/{voices.length} giọng)
+          </label>
+          {isLoadingVoices ? (
+            <div style={styles.loading}>⏳ Đang tải danh sách giọng...</div>
+          ) : error ? (
+            <div style={styles.error}>❌ {error}</div>
+          ) : voices.length > 0 ? (
+            <>
+              {/* Search box */}
+              <input
+                type="text"
+                placeholder="🔍 Tìm kiếm giọng..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={styles.searchInput}
+              />
+              
+              {/* Voice dropdown */}
+              <select
+                value={selectedVoice}
+                onChange={(e) => setSelectedVoice(e.target.value)}
+                style={styles.select}
+              >
+                {filteredVoices.length > 0 ? (
+                  filteredVoices.map((voice) => (
+                    <option key={voice.id} value={voice.id}>
+                      {voice.name}
+                    </option>
+                  ))
+                ) : (
+                  <option disabled>Không tìm thấy giọng phù hợp</option>
+                )}
+              </select>
+              
+              {/* Show all/filtered info */}
+              {searchTerm && filteredVoices.length === 0 && (
+                <div style={styles.noVoices}>
+                  ⚠️ Không tìm thấy giọng: "{searchTerm}"
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={styles.noVoices}>
+              ⚠️ Không có giọng nào cho ngôn ngữ này
+            </div>
+          )}
         </div>
 
         {/* Speed slider */}

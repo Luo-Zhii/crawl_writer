@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
-import { listChapters, readChapter, saveProgress } from "../api/client";
+import { getNovel, listChapters, readChapter, saveProgress } from "../api/client";
 import { Badge, ErrorBox, Spinner } from "../components/Bits";
 import { AudioPlayer } from "../components/AudioPlayer";
 import { FONT_RANGE, WIDTH_RANGE, useReaderPrefs } from "../hooks/useReaderPrefs";
@@ -15,6 +15,13 @@ export default function Reader() {
   const { prefs, update } = useReaderPrefs();
   const [showToc, setShowToc] = useState(false);
   const topRef = useRef<HTMLDivElement>(null);
+
+  // Fetch novel info to get language
+  const novel = useQuery({
+    queryKey: ["novel", novelId],
+    queryFn: () => getNovel(novelId),
+    enabled: Number.isFinite(novelId),
+  });
 
   const chapter = useQuery({
     queryKey: ["chapter", novelId, chapterNumber, prefs.translated],
@@ -110,11 +117,13 @@ export default function Reader() {
       <h1 className="reader-title">{data.title}</h1>
       {data.translated && <Badge tone="accent">bản dịch</Badge>}
 
-      <AudioPlayer
-        chapterNumber={data.number}
-        chapterText={data.text}
-        language="vi"
-      />
+      {novel.data && (
+        <AudioPlayer
+          chapterNumber={data.number}
+          chapterText={data.text}
+          language={(novel.data.lang as any) || "vi"}
+        />
+      )}
 
       <div
         className="reader-body"
