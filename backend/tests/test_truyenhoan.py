@@ -93,7 +93,7 @@ def test_canonical_url_rejects_unrelated_paths():
     source, _ = make_source({})
 
     with pytest.raises(SourceError):
-        source.canonical_url("https://truyenhoan.com/truyen-hot/")
+        source.canonical_url("https://truyenhoan.com/random-path-without-slug/")
 
 
 def test_is_chapter_url():
