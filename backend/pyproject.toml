@@ -18,7 +18,7 @@ dependencies = [
     "sse-starlette>=2.1",
     "charset-normalizer>=3.4",
     "opencc-python-reimplemented>=0.1.7",
-    "capcut-tts-api>=0.1",
+    "capcut-tts-api @ git+https://github.com/K07VN/capcut-tts-api.git",
 ]
 
 [project.optional-dependencies]
@@ -39,6 +39,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["app"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.ruff]
 line-length = 100

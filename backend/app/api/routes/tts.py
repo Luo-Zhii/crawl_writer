@@ -37,10 +37,15 @@ async def tts_status():
 
 
 @router.get("/voices", tags=["tts"])
-async def list_voices(lang: str = Query("vi", regex="^(vi|zh)$")):
-    """List available voices for a language."""
+async def list_voices(lang: str = Query("vi")):
+    """
+    List available voices for a language.
+    
+    Supported languages: vi (Vietnamese), zh (Chinese), en (English), ja (Japanese),
+    th (Thai), es (Spanish), de (German), fr (French), pt (Portuguese), id (Indonesian)
+    """
     voices = tts_service.list_voices(lang)
-    return {"lang": lang, "voices": voices}
+    return {"lang": lang, "count": len(voices), "voices": voices}
 
 
 @router.post("/synthesize", tags=["tts"])
@@ -56,12 +61,18 @@ async def synthesize(request: SynthesizeRequest):
             detail="TTS service not configured. Set up CapCut API credentials.",
         )
 
-    # Validate language
+    # Validate language and get voices
+    if request.lang not in ["vi", "zh", "en", "ja", "th", "es", "de", "fr", "pt", "id"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Language '{request.lang}' not supported",
+        )
+    
     voices = tts_service.list_voices(request.lang)
     if not voices:
         raise HTTPException(
             status_code=400,
-            detail=f"Language '{request.lang}' not supported",
+            detail=f"No voices available for language '{request.lang}'",
         )
 
     # Check if voice exists
